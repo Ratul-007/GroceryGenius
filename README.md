@@ -10,7 +10,7 @@ A smart grocery management and meal planning web application.
 - Grocery price tracker and cost estimator
 
 ## Team
-- Rohan — Backend Developer (Team Leader)
+- Ratul — Backend Developer (Team Leader)
 - Arnab — Frontend Developer
 - Prabak — UI/UX Designer
 
@@ -20,5 +20,3 @@ A smart grocery management and meal planning web application.
 - Database: MySQL
 - Server: Apache (XAMPP)
 
-## Project Status
-Week 1 — Project setup and database schema
