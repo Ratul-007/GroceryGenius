@@ -1,0 +1,1 @@
+echo "<?php echo 'GroceryGenius coming soon'; ?>" > index.php
