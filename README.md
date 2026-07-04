@@ -10,7 +10,7 @@ A smart grocery management and meal planning web application.
 - Grocery price tracker and cost estimator
 
 ## Team
-- Ratul — Backend Developer (Team Leader)
+- Rohan — Backend Developer (Team Leader)
 - Arnab — Frontend Developer
 - Prabak — UI/UX Designer
 
