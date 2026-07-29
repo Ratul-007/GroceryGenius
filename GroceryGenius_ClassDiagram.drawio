@@ -1,0 +1,189 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.2.15 Chrome/134.0.6998.205 Electron/35.2.1 Safari/537.36" version="26.2.15">
+  <diagram id="GroceryGenius_ClassDiagram" name="Page-1">
+    <mxGraphModel dx="1042" dy="674" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="a1" value="Admin" style="swimlane;fontStyle=1;align=center;startSize=30;fillColor=none;fontFamily=Helvetica;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="617" y="28" width="218" height="147" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="-String adminRole" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="a1" vertex="1">
+          <mxGeometry y="30" width="218" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" value="" style="line;fillColor=none;" parent="a1" vertex="1">
+          <mxGeometry y="58" width="218" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" value="+updatePrice(itemName, newPrice) : void&#xa;+manageUsers() : void&#xa;+manageProducts() : void" style="text;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="a1" vertex="1">
+          <mxGeometry y="68" width="218" height="79" as="geometry" />
+        </mxCell>
+        <mxCell id="u1" value="User" style="swimlane;fontStyle=1;align=center;startSize=30;fillColor=none;fontFamily=Helvetica;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="257" y="127" width="215" height="193" as="geometry" />
+        </mxCell>
+        <mxCell id="u2" value="-int userID&#xa;-String name&#xa;-String email&#xa;-String password" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="u1" vertex="1">
+          <mxGeometry y="30" width="215" height="83" as="geometry" />
+        </mxCell>
+        <mxCell id="u3" value="" style="line;fillColor=none;" parent="u1" vertex="1">
+          <mxGeometry y="113" width="215" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="u4" value="+register() : boolean&#xa;+login(email, password) : boolean&#xa;+logout() : void" style="text;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="u1" vertex="1">
+          <mxGeometry y="123" width="215" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r1" value="Recipe" style="swimlane;fontStyle=1;align=center;startSize=30;fillColor=none;fontFamily=Helvetica;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="960" y="60" width="248" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" value="-int recipeID&#xa;-String recipeName&#xa;-List&lt;String&gt; ingredients&#xa;-boolean isPublic" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="r1" vertex="1">
+          <mxGeometry y="30" width="248" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="r3" value="" style="line;fillColor=none;" parent="r1" vertex="1">
+          <mxGeometry y="112" width="248" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="r4" value="+suggestRecipes(pantryItems) : List&lt;Recipe&gt;&#xa;+getMissingIngredients(pantryItems) : List&lt;String&gt;&#xa;+getNutritionInfo() : String" style="text;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="r1" vertex="1">
+          <mxGeometry y="122" width="248" height="98" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" value="BudgetTracker" style="swimlane;fontStyle=1;align=center;startSize=30;fillColor=none;fontFamily=Helvetica;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="383" y="362" width="232" height="213" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" value="-int budgetID&#xa;-double monthlyLimit&#xa;-double spentAmount" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="b1" vertex="1">
+          <mxGeometry y="30" width="232" height="63" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" value="" style="line;fillColor=none;" parent="b1" vertex="1">
+          <mxGeometry y="93" width="232" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" value="+setBudget(limit) : void&#xa;+updateSpent(amount) : void&#xa;+checkLimit() : boolean&#xa;+getRemainingBudget() : double" style="text;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="b1" vertex="1">
+          <mxGeometry y="103" width="232" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p1" value="PantryItem" style="swimlane;fontStyle=1;align=center;startSize=30;fillColor=none;fontFamily=Helvetica;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="858" y="292" width="237" height="217" as="geometry" />
+        </mxCell>
+        <mxCell id="p2" value="-int itemID&#xa;-String itemName&#xa;-double quantity&#xa;-String unit&#xa;-Date expiryDate" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="p1" vertex="1">
+          <mxGeometry y="30" width="237" height="98" as="geometry" />
+        </mxCell>
+        <mxCell id="p3" value="" style="line;fillColor=none;" parent="p1" vertex="1">
+          <mxGeometry y="128" width="237" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="p4" value="+updateQuantity(qty) : void&#xa;+isExpired() : boolean&#xa;+setExpiryAlert() : void" style="text;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="p1" vertex="1">
+          <mxGeometry y="138" width="237" height="79" as="geometry" />
+        </mxCell>
+        <mxCell id="sl1" value="ShoppingList" style="swimlane;fontStyle=1;align=center;startSize=30;fillColor=none;fontFamily=Helvetica;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="63" y="555" width="226" height="204" as="geometry" />
+        </mxCell>
+        <mxCell id="sl2" value="-int listID&#xa;-Date createdDate&#xa;-double estimatedCost" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="sl1" vertex="1">
+          <mxGeometry y="30" width="226" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="sl3" value="" style="line;fillColor=none;" parent="sl1" vertex="1">
+          <mxGeometry y="95" width="226" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="sl4" value="+addItem(item) : void&#xa;+removeItem(item) : void&#xa;+calculateEstimatedCost() : double&#xa;+share(member) : void" style="text;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="sl1" vertex="1">
+          <mxGeometry y="105" width="226" height="99" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="Notification" style="swimlane;fontStyle=1;align=center;startSize=30;fillColor=none;fontFamily=Helvetica;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="640" y="600" width="227" height="187" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="-int notificationID&#xa;-String type&#xa;-String message&#xa;-Date createdAt" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="n1" vertex="1">
+          <mxGeometry y="30" width="227" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="" style="line;fillColor=none;" parent="n1" vertex="1">
+          <mxGeometry y="112" width="227" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" value="+send() : void&#xa;+markAsRead() : void" style="text;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="n1" vertex="1">
+          <mxGeometry y="122" width="227" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="si1" value="ShoppingListItem" style="swimlane;fontStyle=1;align=center;startSize=30;fillColor=none;fontFamily=Helvetica;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="68" y="827" width="222" height="178" as="geometry" />
+        </mxCell>
+        <mxCell id="si2" value="-int itemID&#xa;-String itemName&#xa;-double quantity&#xa;-double unitPrice" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="si1" vertex="1">
+          <mxGeometry y="30" width="222" height="82" as="geometry" />
+        </mxCell>
+        <mxCell id="si3" value="" style="line;fillColor=none;" parent="si1" vertex="1">
+          <mxGeometry y="112" width="222" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="si4" value="+getSubtotal() : double&#xa;+updateQuantity(qty) : void" style="text;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="si1" vertex="1">
+          <mxGeometry y="122" width="222" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="gp1" value="GroceryPrice" style="swimlane;fontStyle=1;align=center;startSize=30;fillColor=none;fontFamily=Helvetica;fontSize=12;" parent="1" vertex="1">
+          <mxGeometry x="547" y="797" width="234" height="197" as="geometry" />
+        </mxCell>
+        <mxCell id="gp2" value="-int priceID&#xa;-String itemName&#xa;-String category&#xa;-double unitPrice&#xa;-Date lastUpdated" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="gp1" vertex="1">
+          <mxGeometry y="30" width="234" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="gp3" value="" style="line;fillColor=none;" parent="gp1" vertex="1">
+          <mxGeometry y="130" width="234" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="gp4" value="+getPrice() : double&#xa;+updatePrice(newPrice) : void" style="text;fillColor=none;align=left;verticalAlign=top;spacingLeft=8;fontFamily=Helvetica;fontSize=11;" parent="gp1" vertex="1">
+          <mxGeometry y="140" width="234" height="57" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="endArrow=open;endFill=0;endSize=8;" parent="1" source="a1" target="u1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="endArrow=open;endFill=0;endSize=8;" parent="1" source="a1" target="r1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="endArrow=open;endFill=0;endSize=8;" parent="1" source="u1" target="b1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" parent="e3" vertex="1" connectable="0">
+          <mxGeometry x="-0.8" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3t" value="1" style="resizable=0;html=1;align=right;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" parent="e3" vertex="1" connectable="0">
+          <mxGeometry x="0.8" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" value="" style="endArrow=open;endFill=0;endSize=8;" parent="1" source="u1" target="p1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="endArrow=open;endFill=0;endSize=8;" parent="1" source="u1" target="sl1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" parent="e5" vertex="1" connectable="0">
+          <mxGeometry x="-0.8" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" value="" style="endArrow=open;endFill=0;endSize=8;strokeColor=#555555;" parent="1" source="p1" target="r1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="endArrow=open;endFill=0;endSize=8;" parent="1" source="b1" target="sl1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="endArrow=open;endFill=0;endSize=8;" parent="1" source="p1" target="n1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="" style="endArrow=open;endFill=0;endSize=8;" parent="1" source="b1" target="n1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="endArrow=open;endFill=0;endSize=8;" parent="1" source="sl1" target="si1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10l" value="contains" style="resizable=0;html=1;align=center;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;fontStyle=2;" parent="e10" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10s" value="1" style="resizable=0;html=1;align=left;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" parent="e10" vertex="1" connectable="0">
+          <mxGeometry x="-0.8" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10t" value="*" style="resizable=0;html=1;align=right;verticalAlign=bottom;labelBackgroundColor=none;fontSize=10;" parent="e10" vertex="1" connectable="0">
+          <mxGeometry x="0.8" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11" value="" style="endArrow=open;endFill=0;endSize=8;" parent="1" source="si1" target="gp1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uu8LpZOkOopdXoMN4i76-3" value="" style="curved=1;endArrow=classic;html=1;rounded=0;exitX=1;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="a4" target="gp2">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="867" y="105" as="sourcePoint" />
+            <mxPoint x="1200" y="530" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="910" y="200" />
+              <mxPoint x="1270" y="420" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

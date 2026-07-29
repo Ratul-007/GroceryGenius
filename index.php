@@ -1,1 +1,1 @@
-echo "<?php echo 'GroceryGenius coming soon'; ?>" > index.php
+﻿<?php header('Location: pages/login.php'); exit; ?>
