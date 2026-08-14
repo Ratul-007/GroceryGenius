@@ -11,64 +11,82 @@ $user_id = (int) $_SESSION['user_id'];
 $message = '';
 $error = '';
 
-// Handle add item
+// Add a product to the pending shopping list.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_item'])) {
     $product_id = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
     $quantity = isset($_POST['quantity']) ? trim($_POST['quantity']) : '';
 
-    if ($product_id <= 0 || $quantity === '' || !is_numeric($quantity) || (float)$quantity <= 0) {
+    if ($product_id <= 0 || $quantity === '' || !is_numeric($quantity) || (float) $quantity <= 0) {
         $error = 'Please select a product and enter a valid quantity.';
     } else {
-        $check = $conn->prepare("SELECT list_item_id FROM shopping_list WHERE user_id = ? AND product_id = ? AND is_purchased = 0 LIMIT 1");
-        $check->bind_param('ii', $user_id, $product_id);
-        $check->execute();
-        $existing = $check->get_result();
+        $check = $pdo->prepare(
+            'SELECT list_item_id FROM shopping_list
+             WHERE user_id = :user_id AND product_id = :product_id AND is_purchased = 0
+             LIMIT 1'
+        );
+        $check->execute([
+            ':user_id' => $user_id,
+            ':product_id' => $product_id
+        ]);
 
-        if ($existing->num_rows > 0) {
+        if ($check->fetch()) {
             $error = 'This product is already in your pending shopping list.';
         } else {
-            $stmt = $conn->prepare("INSERT INTO shopping_list (user_id, product_id, quantity, is_purchased) VALUES (?, ?, ?, 0)");
-            $stmt->bind_param('iis', $user_id, $product_id, $quantity);
-            if ($stmt->execute()) {
-                $message = 'Item added to your shopping list.';
-            } else {
-                $error = 'Unable to add the item. Please try again.';
-            }
-            $stmt->close();
+            $stmt = $pdo->prepare(
+                'INSERT INTO shopping_list (user_id, product_id, quantity, is_purchased)
+                 VALUES (:user_id, :product_id, :quantity, 0)'
+            );
+            $stmt->execute([
+                ':user_id' => $user_id,
+                ':product_id' => $product_id,
+                ':quantity' => $quantity
+            ]);
+            $message = 'Item added to your shopping list.';
         }
-        $check->close();
     }
 }
 
-// Mark pending item as purchased
+// Mark an item as purchased.
 if (isset($_GET['purchase'])) {
     $list_item_id = (int) $_GET['purchase'];
-    $stmt = $conn->prepare("UPDATE shopping_list SET is_purchased = 1 WHERE list_item_id = ? AND user_id = ?");
-    $stmt->bind_param('ii', $list_item_id, $user_id);
-    $stmt->execute();
-    $stmt->close();
+    $stmt = $pdo->prepare(
+        'UPDATE shopping_list SET is_purchased = 1
+         WHERE list_item_id = :list_item_id AND user_id = :user_id'
+    );
+    $stmt->execute([
+        ':list_item_id' => $list_item_id,
+        ':user_id' => $user_id
+    ]);
     header('Location: shopping.php?status=purchased');
     exit();
 }
 
-// Undo purchased item
+// Move a purchased item back to pending.
 if (isset($_GET['undo'])) {
     $list_item_id = (int) $_GET['undo'];
-    $stmt = $conn->prepare("UPDATE shopping_list SET is_purchased = 0 WHERE list_item_id = ? AND user_id = ?");
-    $stmt->bind_param('ii', $list_item_id, $user_id);
-    $stmt->execute();
-    $stmt->close();
+    $stmt = $pdo->prepare(
+        'UPDATE shopping_list SET is_purchased = 0
+         WHERE list_item_id = :list_item_id AND user_id = :user_id'
+    );
+    $stmt->execute([
+        ':list_item_id' => $list_item_id,
+        ':user_id' => $user_id
+    ]);
     header('Location: shopping.php?status=restored');
     exit();
 }
 
-// Delete item
+// Delete an item belonging to the logged-in user.
 if (isset($_GET['delete'])) {
     $list_item_id = (int) $_GET['delete'];
-    $stmt = $conn->prepare("DELETE FROM shopping_list WHERE list_item_id = ? AND user_id = ?");
-    $stmt->bind_param('ii', $list_item_id, $user_id);
-    $stmt->execute();
-    $stmt->close();
+    $stmt = $pdo->prepare(
+        'DELETE FROM shopping_list
+         WHERE list_item_id = :list_item_id AND user_id = :user_id'
+    );
+    $stmt->execute([
+        ':list_item_id' => $list_item_id,
+        ':user_id' => $user_id
+    ]);
     header('Location: shopping.php?status=deleted');
     exit();
 }
@@ -84,20 +102,32 @@ if (isset($_GET['status'])) {
     }
 }
 
-// Available products for manual additions
-$products = $conn->query("SELECT product_id, name, category, unit FROM products ORDER BY name ASC");
+// Products available for manual additions.
+$products = $pdo->query(
+    'SELECT product_id, name, category, unit FROM products ORDER BY name ASC'
+)->fetchAll();
 
-// Pending items
-$pending = $conn->prepare("SELECT sl.list_item_id, sl.quantity, p.name, p.category, p.unit FROM shopping_list sl INNER JOIN products p ON sl.product_id = p.product_id WHERE sl.user_id = ? AND sl.is_purchased = 0 ORDER BY p.name ASC");
-$pending->bind_param('i', $user_id);
-$pending->execute();
-$pending_items = $pending->get_result();
+// Pending items.
+$pending_stmt = $pdo->prepare(
+    'SELECT sl.list_item_id, sl.quantity, p.name, p.category, p.unit
+     FROM shopping_list sl
+     INNER JOIN products p ON sl.product_id = p.product_id
+     WHERE sl.user_id = :user_id AND sl.is_purchased = 0
+     ORDER BY p.name ASC'
+);
+$pending_stmt->execute([':user_id' => $user_id]);
+$pending_items = $pending_stmt->fetchAll();
 
-// Purchased items
-$purchased = $conn->prepare("SELECT sl.list_item_id, sl.quantity, p.name, p.category, p.unit FROM shopping_list sl INNER JOIN products p ON sl.product_id = p.product_id WHERE sl.user_id = ? AND sl.is_purchased = 1 ORDER BY p.name ASC");
-$purchased->bind_param('i', $user_id);
-$purchased->execute();
-$purchased_items = $purchased->get_result();
+// Purchased items.
+$purchased_stmt = $pdo->prepare(
+    'SELECT sl.list_item_id, sl.quantity, p.name, p.category, p.unit
+     FROM shopping_list sl
+     INNER JOIN products p ON sl.product_id = p.product_id
+     WHERE sl.user_id = :user_id AND sl.is_purchased = 1
+     ORDER BY p.name ASC'
+);
+$purchased_stmt->execute([':user_id' => $user_id]);
+$purchased_items = $purchased_stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -159,12 +189,12 @@ $purchased_items = $purchased->get_result();
                 <label for="product_id">Product</label>
                 <select id="product_id" name="product_id" required>
                     <option value="">Select a product</option>
-                    <?php if ($products): while ($product = $products->fetch_assoc()): ?>
-                        <option value="<?php echo (int)$product['product_id']; ?>">
+                    <?php foreach ($products as $product): ?>
+                        <option value="<?php echo (int) $product['product_id']; ?>">
                             <?php echo htmlspecialchars($product['name']); ?>
                             <?php if (!empty($product['category'])) echo ' — ' . htmlspecialchars($product['category']); ?>
                         </option>
-                    <?php endwhile; endif; ?>
+                    <?php endforeach; ?>
                 </select>
             </div>
             <div class="form-group">
@@ -178,14 +208,14 @@ $purchased_items = $purchased->get_result();
     <section class="list-card">
         <div class="section-title">
             <h2>Pending Items</h2>
-            <span><?php echo $pending_items->num_rows; ?> item(s)</span>
+            <span><?php echo count($pending_items); ?> item(s)</span>
         </div>
 
         <div class="item-list">
-            <?php if ($pending_items->num_rows === 0): ?>
+            <?php if (empty($pending_items)): ?>
                 <div class="empty">Your shopping list is empty. Add an item or use a recipe's missing ingredients option.</div>
             <?php else: ?>
-                <?php while ($item = $pending_items->fetch_assoc()): ?>
+                <?php foreach ($pending_items as $item): ?>
                     <div class="item">
                         <div class="item-info">
                             <strong><?php echo htmlspecialchars($item['name']); ?></strong>
@@ -195,11 +225,11 @@ $purchased_items = $purchased->get_result();
                             </div>
                         </div>
                         <div class="item-actions">
-                            <a class="btn btn-success" href="shopping.php?purchase=<?php echo (int)$item['list_item_id']; ?>">✓ Purchased</a>
-                            <a class="btn btn-danger" href="shopping.php?delete=<?php echo (int)$item['list_item_id']; ?>" onclick="return confirm('Remove this item from your shopping list?');">Delete</a>
+                            <a class="btn btn-success" href="shopping.php?purchase=<?php echo (int) $item['list_item_id']; ?>">✓ Purchased</a>
+                            <a class="btn btn-danger" href="shopping.php?delete=<?php echo (int) $item['list_item_id']; ?>" onclick="return confirm('Remove this item from your shopping list?');">Delete</a>
                         </div>
                     </div>
-                <?php endwhile; ?>
+                <?php endforeach; ?>
             <?php endif; ?>
         </div>
     </section>
@@ -207,14 +237,14 @@ $purchased_items = $purchased->get_result();
     <section class="list-card">
         <div class="section-title">
             <h2>Purchased Items</h2>
-            <span><?php echo $purchased_items->num_rows; ?> item(s)</span>
+            <span><?php echo count($purchased_items); ?> item(s)</span>
         </div>
 
         <div class="item-list">
-            <?php if ($purchased_items->num_rows === 0): ?>
+            <?php if (empty($purchased_items)): ?>
                 <div class="empty">No purchased items yet.</div>
             <?php else: ?>
-                <?php while ($item = $purchased_items->fetch_assoc()): ?>
+                <?php foreach ($purchased_items as $item): ?>
                     <div class="item">
                         <div class="item-info">
                             <strong>✓ <?php echo htmlspecialchars($item['name']); ?></strong>
@@ -223,20 +253,14 @@ $purchased_items = $purchased->get_result();
                             </div>
                         </div>
                         <div class="item-actions">
-                            <a class="btn btn-secondary" href="shopping.php?undo=<?php echo (int)$item['list_item_id']; ?>">↩ Undo</a>
-                            <a class="btn btn-danger" href="shopping.php?delete=<?php echo (int)$item['list_item_id']; ?>" onclick="return confirm('Delete this purchased item?');">Delete</a>
+                            <a class="btn btn-secondary" href="shopping.php?undo=<?php echo (int) $item['list_item_id']; ?>">↩ Undo</a>
+                            <a class="btn btn-danger" href="shopping.php?delete=<?php echo (int) $item['list_item_id']; ?>" onclick="return confirm('Delete this purchased item?');">Delete</a>
                         </div>
                     </div>
-                <?php endwhile; ?>
+                <?php endforeach; ?>
             <?php endif; ?>
         </div>
     </section>
 </main>
 </body>
 </html>
-
-<?php
-$pending->close();
-$purchased->close();
-$conn->close();
-?>
