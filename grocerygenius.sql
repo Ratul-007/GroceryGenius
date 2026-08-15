@@ -32,11 +32,12 @@ CREATE TABLE pantry_items (
 );
 
 CREATE TABLE shopping_list (
-  list_item_id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id      INT,
-  product_id   INT,
-  quantity     DECIMAL(8,2),
-  is_purchased TINYINT DEFAULT 0,
+  list_item_id   INT AUTO_INCREMENT PRIMARY KEY,
+  user_id        INT,
+  product_id     INT,
+  quantity       DECIMAL(8,2),
+  is_purchased   TINYINT DEFAULT 0,
+  purchase_amount DECIMAL(10,2) NULL,
   FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
