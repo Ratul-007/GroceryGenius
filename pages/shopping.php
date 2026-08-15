@@ -15,15 +15,20 @@ $error = '';
 $prefill_product_id = (int) ($_GET['product_id'] ?? 0);
 $current_month = date('Y-m');
 
-// Week 3 AJAX endpoint: toggle purchased state and clear completed items.
-// When an item is purchased, its current tracked price is recorded and added
-// to the current month's budget. When it is undone, that recorded amount is removed.
+/*
+ * AJAX purchase workflow.
+ * Purchase: capture the current grocery price, create permanent purchase history,
+ * update the current month's budget, then mark the shopping item purchased.
+ * Undo: reverse the exact recorded amount, remove the history record, and return
+ * the item to pending.
+ */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
     header('Content-Type: application/json; charset=utf-8');
     $action = $_POST['ajax_action'];
 
     if ($action === 'toggle_purchase') {
         $list_item_id = (int) ($_POST['list_item_id'] ?? 0);
+
         if ($list_item_id <= 0) {
             echo json_encode(['success' => false, 'message' => 'Invalid shopping item.']);
             exit;
@@ -33,14 +38,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             $pdo->beginTransaction();
 
             $stmt = $pdo->prepare(
-                'SELECT sl.is_purchased, sl.quantity, sl.purchase_amount,
+                'SELECT sl.list_item_id, sl.product_id, sl.is_purchased, sl.quantity,
+                        sl.purchase_amount, p.name AS product_name, p.unit,
                         gp.price_bdt AS current_price
                  FROM shopping_list sl
+                 INNER JOIN products p ON p.product_id = sl.product_id
                  LEFT JOIN grocery_prices gp ON gp.product_id = sl.product_id
                  WHERE sl.list_item_id = :item_id AND sl.user_id = :user_id
                  LIMIT 1'
             );
-            $stmt->execute([':item_id' => $list_item_id, ':user_id' => $user_id]);
+            $stmt->execute([
+                ':item_id' => $list_item_id,
+                ':user_id' => $user_id
+            ]);
             $item = $stmt->fetch();
 
             if (!$item) {
@@ -50,45 +60,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             }
 
             $was_purchased = (int) $item['is_purchased'] === 1;
-            $new_status = $was_purchased ? 0 : 1;
 
-            if ($new_status === 1) {
-                $purchase_amount = null;
-                $budget_updated = false;
-
-                if ($item['current_price'] !== null) {
-                    $purchase_amount = round(
-                        (float) $item['current_price'] * (float) $item['quantity'],
-                        2
-                    );
-
-                    $budget_stmt = $pdo->prepare(
-                        'SELECT budget_id
-                         FROM budget
-                         WHERE user_id = :user_id AND month = :month
-                         LIMIT 1'
-                    );
-                    $budget_stmt->execute([
-                        ':user_id' => $user_id,
-                        ':month' => $current_month
+            if (!$was_purchased) {
+                if ($item['current_price'] === null) {
+                    $pdo->rollBack();
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'This product has no current tracked price. Add a price before marking it purchased.'
                     ]);
-                    $budget = $budget_stmt->fetch();
-
-                    if ($budget) {
-                        $update_budget = $pdo->prepare(
-                            'UPDATE budget
-                             SET spent_amount = spent_amount + :amount
-                             WHERE budget_id = :budget_id AND user_id = :user_id'
-                        );
-                        $update_budget->execute([
-                            ':amount' => $purchase_amount,
-                            ':budget_id' => (int) $budget['budget_id'],
-                            ':user_id' => $user_id
-                        ]);
-                        $budget_updated = true;
-                    }
+                    exit;
                 }
 
+                $quantity = (float) $item['quantity'];
+                $price_per_unit = (float) $item['current_price'];
+                $purchase_amount = round($quantity * $price_per_unit, 2);
+
+                // A monthly budget must exist before a purchase can affect spending.
+                $budget_stmt = $pdo->prepare(
+                    'SELECT budget_id
+                     FROM budget
+                     WHERE user_id = :user_id AND month = :month
+                     LIMIT 1'
+                );
+                $budget_stmt->execute([
+                    ':user_id' => $user_id,
+                    ':month' => $current_month
+                ]);
+                $budget = $budget_stmt->fetch();
+
+                if (!$budget) {
+                    $pdo->rollBack();
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'Please set your monthly budget before marking an item as purchased.'
+                    ]);
+                    exit;
+                }
+
+                // Prevent duplicate history rows if the request is repeated.
+                $history_check = $pdo->prepare(
+                    'SELECT purchase_id
+                     FROM purchase_history
+                     WHERE shopping_list_id = :shopping_list_id
+                       AND user_id = :user_id
+                     LIMIT 1'
+                );
+                $history_check->execute([
+                    ':shopping_list_id' => $list_item_id,
+                    ':user_id' => $user_id
+                ]);
+
+                if ($history_check->fetch()) {
+                    $pdo->rollBack();
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'A purchase history record already exists for this item.'
+                    ]);
+                    exit;
+                }
+
+                // Permanently record the price and amount at purchase time.
+                $history_stmt = $pdo->prepare(
+                    'INSERT INTO purchase_history
+                        (user_id, product_id, product_name, quantity, unit,
+                         price_per_unit, total_amount, purchased_at, shopping_list_id)
+                     VALUES
+                        (:user_id, :product_id, :product_name, :quantity, :unit,
+                         :price_per_unit, :total_amount, NOW(), :shopping_list_id)'
+                );
+                $history_stmt->execute([
+                    ':user_id' => $user_id,
+                    ':product_id' => (int) $item['product_id'],
+                    ':product_name' => $item['product_name'],
+                    ':quantity' => $quantity,
+                    ':unit' => $item['unit'] ?? 'unit',
+                    ':price_per_unit' => $price_per_unit,
+                    ':total_amount' => $purchase_amount,
+                    ':shopping_list_id' => $list_item_id
+                ]);
+
+                // Add exactly the same recorded purchase amount to this month's budget.
+                $update_budget = $pdo->prepare(
+                    'UPDATE budget
+                     SET spent_amount = spent_amount + :amount
+                     WHERE budget_id = :budget_id AND user_id = :user_id'
+                );
+                $update_budget->execute([
+                    ':amount' => $purchase_amount,
+                    ':budget_id' => (int) $budget['budget_id'],
+                    ':user_id' => $user_id
+                ]);
+
+                // Finally mark the shopping item purchased.
                 $update = $pdo->prepare(
                     'UPDATE shopping_list
                      SET is_purchased = 1, purchase_amount = :purchase_amount
@@ -102,54 +165,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
 
                 $pdo->commit();
 
-                if ($purchase_amount === null) {
-                    $message = 'Item marked as purchased, but no current price is available for budget tracking.';
-                } elseif ($budget_updated) {
-                    $message = 'Item purchased and ৳' . number_format($purchase_amount, 2) . ' added to this month\'s budget.';
-                } else {
-                    $message = 'Item marked as purchased. Set a monthly budget to track spending automatically.';
-                }
-
                 echo json_encode([
                     'success' => true,
                     'is_purchased' => 1,
                     'purchase_amount' => $purchase_amount,
-                    'message' => $message
+                    'message' => 'Item purchased. ৳' . number_format($purchase_amount, 2) . ' added to this month\'s budget and saved to Purchase History.'
                 ]);
                 exit;
             }
 
-            // Undo purchase: remove the exact amount that was recorded at purchase time.
+            // Undo: use the amount recorded at the original purchase, not today's price.
             $purchase_amount = $item['purchase_amount'] !== null
                 ? (float) $item['purchase_amount']
                 : 0.0;
 
-            if ($purchase_amount > 0) {
-                $budget_stmt = $pdo->prepare(
-                    'SELECT budget_id
-                     FROM budget
-                     WHERE user_id = :user_id AND month = :month
-                     LIMIT 1'
-                );
-                $budget_stmt->execute([
-                    ':user_id' => $user_id,
-                    ':month' => $current_month
-                ]);
-                $budget = $budget_stmt->fetch();
+            $budget_stmt = $pdo->prepare(
+                'SELECT budget_id
+                 FROM budget
+                 WHERE user_id = :user_id AND month = :month
+                 LIMIT 1'
+            );
+            $budget_stmt->execute([
+                ':user_id' => $user_id,
+                ':month' => $current_month
+            ]);
+            $budget = $budget_stmt->fetch();
 
-                if ($budget) {
-                    $update_budget = $pdo->prepare(
-                        'UPDATE budget
-                         SET spent_amount = GREATEST(0, spent_amount - :amount)
-                         WHERE budget_id = :budget_id AND user_id = :user_id'
-                    );
-                    $update_budget->execute([
-                        ':amount' => $purchase_amount,
-                        ':budget_id' => (int) $budget['budget_id'],
-                        ':user_id' => $user_id
-                    ]);
-                }
+            if ($purchase_amount > 0 && $budget) {
+                $update_budget = $pdo->prepare(
+                    'UPDATE budget
+                     SET spent_amount = GREATEST(0, spent_amount - :amount)
+                     WHERE budget_id = :budget_id AND user_id = :user_id'
+                );
+                $update_budget->execute([
+                    ':amount' => $purchase_amount,
+                    ':budget_id' => (int) $budget['budget_id'],
+                    ':user_id' => $user_id
+                ]);
             }
+
+            // Remove only the history record belonging to this active shopping item.
+            $history_delete = $pdo->prepare(
+                'DELETE FROM purchase_history
+                 WHERE shopping_list_id = :shopping_list_id
+                   AND user_id = :user_id'
+            );
+            $history_delete->execute([
+                ':shopping_list_id' => $list_item_id,
+                ':user_id' => $user_id
+            ]);
 
             $update = $pdo->prepare(
                 'UPDATE shopping_list
@@ -168,7 +232,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 'is_purchased' => 0,
                 'purchase_amount' => null,
                 'message' => $purchase_amount > 0
-                    ? 'Purchase undone and ৳' . number_format($purchase_amount, 2) . ' removed from this month\'s budget.'
+                    ? 'Purchase undone. ৳' . number_format($purchase_amount, 2) . ' removed from this month\'s budget and Purchase History.'
                     : 'Item moved back to pending.'
             ]);
             exit;
@@ -176,6 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            error_log('GroceryGenius shopping purchase error: ' . $e->getMessage());
             echo json_encode([
                 'success' => false,
                 'message' => 'Unable to update the purchase. Please try again.'
@@ -185,20 +250,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
     }
 
     if ($action === 'clear_done') {
-        $stmt = $pdo->prepare(
-            'DELETE FROM shopping_list
-             WHERE user_id = :user_id AND is_purchased = 1'
-        );
-        $stmt->execute([':user_id' => $user_id]);
-        $deleted = $stmt->rowCount();
+        try {
+            $stmt = $pdo->prepare(
+                'DELETE FROM shopping_list
+                 WHERE user_id = :user_id AND is_purchased = 1'
+            );
+            $stmt->execute([':user_id' => $user_id]);
+            $deleted = $stmt->rowCount();
 
-        echo json_encode([
-            'success' => true,
-            'deleted' => $deleted,
-            'message' => $deleted > 0
-                ? 'Purchased items cleared successfully. Budget records were kept.'
-                : 'There are no purchased items to clear.'
-        ]);
+            echo json_encode([
+                'success' => true,
+                'deleted' => $deleted,
+                'message' => $deleted > 0
+                    ? 'Purchased items cleared. Purchase History and Budget records were kept.'
+                    : 'There are no purchased items to clear.'
+            ]);
+        } catch (Throwable $e) {
+            error_log('GroceryGenius clear done error: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Unable to clear purchased items.']);
+        }
         exit;
     }
 
@@ -216,7 +286,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_item'])) {
     } else {
         $check = $pdo->prepare(
             'SELECT list_item_id FROM shopping_list
-             WHERE user_id = :user_id AND product_id = :product_id AND is_purchased = 0 LIMIT 1'
+             WHERE user_id = :user_id AND product_id = :product_id AND is_purchased = 0
+             LIMIT 1'
         );
         $check->execute([':user_id' => $user_id, ':product_id' => $product_id]);
 
@@ -238,7 +309,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_item'])) {
     }
 }
 
-// Delete a single item.
+// Delete a single shopping-list item.
 if (isset($_GET['delete'])) {
     $list_item_id = (int) $_GET['delete'];
     $stmt = $pdo->prepare(
@@ -254,7 +325,7 @@ if (isset($_GET['status']) && $_GET['status'] === 'deleted') {
     $message = 'Item removed from the shopping list.';
 }
 
-// Product catalogue includes the live current price from Price Tracker.
+// Product catalogue uses the current value stored in grocery_prices.
 $products = $pdo->query(
     'SELECT p.product_id, p.name, p.category, p.unit,
             gp.price_bdt AS current_price
@@ -290,7 +361,6 @@ $purchased_stmt->execute([':user_id' => $user_id]);
 $purchased_items = $purchased_stmt->fetchAll();
 
 $total_items = count($pending_items) + count($purchased_items);
-
 $pending_estimate = 0.0;
 foreach ($pending_items as $item) {
     if ($item['current_price'] !== null) {
@@ -397,16 +467,58 @@ foreach ($purchased_items as $item) {
     const clearDoneBtn=document.getElementById('clearDoneBtn');
     const ajaxNotice=document.getElementById('ajaxNotice');
 
-    function notice(message,error=false){ajaxNotice.textContent=message;ajaxNotice.className=error?'error':'notice';ajaxNotice.style.display='block';setTimeout(()=>ajaxNotice.style.display='none',4000)}
+    function notice(message,error=false){ajaxNotice.textContent=message;ajaxNotice.className=error?'error':'notice';ajaxNotice.style.display='block';setTimeout(()=>ajaxNotice.style.display='none',4500)}
     function counts(){const p=pendingList.querySelectorAll('.shopping-item').length;const d=purchasedList.querySelectorAll('.shopping-item').length;pendingCount.textContent=p;purchasedCount.textContent=d;totalCount.textContent=p+d;pendingSectionCount.textContent=p+' item(s)';purchasedSectionCount.textContent=d+' item(s)';clearDoneBtn.style.display=d?'inline-flex':'none'}
     function empty(list,id,text){const has=list.querySelector('.shopping-item');const old=document.getElementById(id);if(!has&&!old){const e=document.createElement('div');e.className='empty-state';e.id=id;e.textContent=text;list.appendChild(e)}if(has&&old)old.remove()}
     function bindCheckboxes(){document.querySelectorAll('.item-check:not([data-bound])').forEach(cb=>{cb.dataset.bound='1';cb.addEventListener('change',()=>toggle(cb))})}
 
-    async function toggle(cb){const item=cb.closest('.shopping-item');cb.disabled=true;const originalChecked=!cb.checked;const fd=new FormData();fd.append('ajax_action','toggle_purchase');fd.append('list_item_id',cb.dataset.itemId);try{const r=await fetch('shopping.php',{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});const data=await r.json();if(!data.success)throw new Error(data.message||'Unable to update item.');const purchased=Number(data.is_purchased)===1;cb.checked=purchased;item.classList.toggle('purchased',purchased);if(purchased)purchasedList.appendChild(item);else pendingList.appendChild(item);empty(pendingList,'pendingEmpty',"Your shopping list is empty. Add an item or use a recipe's missing ingredients option.");empty(purchasedList,'purchasedEmpty','No purchased items yet.');counts();bindCheckboxes();notice(data.message)}catch(e){cb.checked=originalChecked;notice(e.message||'Something went wrong.',true)}finally{cb.disabled=false}}
+    async function toggle(cb){
+        const item=cb.closest('.shopping-item');
+        cb.disabled=true;
+        const originalChecked=!cb.checked;
+        const fd=new FormData();
+        fd.append('ajax_action','toggle_purchase');
+        fd.append('list_item_id',cb.dataset.itemId);
+        try{
+            const r=await fetch('shopping.php',{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
+            const data=await r.json();
+            if(!data.success)throw new Error(data.message||'Unable to update item.');
+            const purchased=Number(data.is_purchased)===1;
+            cb.checked=purchased;
+            item.classList.toggle('purchased',purchased);
+            if(purchased)purchasedList.appendChild(item);else pendingList.appendChild(item);
+            empty(pendingList,'pendingEmpty',"Your shopping list is empty. Add an item or use a recipe's missing ingredients option.");
+            empty(purchasedList,'purchasedEmpty','No purchased items yet.');
+            counts();
+            bindCheckboxes();
+            notice(data.message);
+        }catch(e){
+            cb.checked=originalChecked;
+            notice(e.message||'Something went wrong.',true);
+        }finally{cb.disabled=false}
+    }
 
-    async function clearDone(){const items=[...purchasedList.querySelectorAll('.shopping-item')];if(!items.length)return;if(!confirm('Clear all purchased items from your shopping list?'))return;clearDoneBtn.disabled=true;const fd=new FormData();fd.append('ajax_action','clear_done');try{const r=await fetch('shopping.php',{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});const data=await r.json();if(!data.success)throw new Error(data.message||'Unable to clear purchased items.');items.forEach(i=>i.remove());empty(purchasedList,'purchasedEmpty','No purchased items yet.');counts();notice(data.message)}catch(e){notice(e.message||'Something went wrong.',true)}finally{clearDoneBtn.disabled=false}}
+    async function clearDone(){
+        const items=[...purchasedList.querySelectorAll('.shopping-item')];
+        if(!items.length)return;
+        if(!confirm('Clear all purchased items from your shopping list?'))return;
+        clearDoneBtn.disabled=true;
+        const fd=new FormData();fd.append('ajax_action','clear_done');
+        try{
+            const r=await fetch('shopping.php',{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
+            const data=await r.json();
+            if(!data.success)throw new Error(data.message||'Unable to clear purchased items.');
+            items.forEach(i=>i.remove());
+            empty(purchasedList,'purchasedEmpty','No purchased items yet.');
+            counts();
+            notice(data.message);
+        }catch(e){notice(e.message||'Something went wrong.',true)}
+        finally{clearDoneBtn.disabled=false}
+    }
 
-    bindCheckboxes();clearDoneBtn.addEventListener('click',clearDone);counts();
+    bindCheckboxes();
+    clearDoneBtn.addEventListener('click',clearDone);
+    counts();
 })();
 </script>
 </body>
