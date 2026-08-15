@@ -12,6 +12,7 @@ $user_name = $_SESSION['user_name'] ?? 'Member';
 $avatar_letter = strtoupper(substr($user_name, 0, 1));
 $message = '';
 $error = '';
+$prefill_product_id = (int) ($_GET['product_id'] ?? 0);
 
 // Week 3 AJAX endpoint: toggle purchased state and clear completed items.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
@@ -105,6 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_item'])) {
                 ':quantity' => $quantity
             ]);
             $message = 'Item added to your shopping list.';
+            $prefill_product_id = $product_id;
         }
     }
 }
@@ -125,15 +127,22 @@ if (isset($_GET['status']) && $_GET['status'] === 'deleted') {
     $message = 'Item removed from the shopping list.';
 }
 
+// Product catalogue now includes the live current price from Price Tracker.
 $products = $pdo->query(
-    'SELECT product_id, name, category, unit FROM products ORDER BY name ASC'
+    'SELECT p.product_id, p.name, p.category, p.unit,
+            gp.price_bdt AS current_price
+     FROM products p
+     LEFT JOIN grocery_prices gp ON gp.product_id = p.product_id
+     ORDER BY p.name ASC'
 )->fetchAll();
 
 $pending_stmt = $pdo->prepare(
     'SELECT sl.list_item_id, sl.quantity, sl.is_purchased,
-            p.name, p.category, p.unit
+            p.name, p.category, p.unit,
+            gp.price_bdt AS current_price
      FROM shopping_list sl
      INNER JOIN products p ON sl.product_id = p.product_id
+     LEFT JOIN grocery_prices gp ON gp.product_id = p.product_id
      WHERE sl.user_id = :user_id AND sl.is_purchased = 0
      ORDER BY p.name ASC'
 );
@@ -142,9 +151,11 @@ $pending_items = $pending_stmt->fetchAll();
 
 $purchased_stmt = $pdo->prepare(
     'SELECT sl.list_item_id, sl.quantity, sl.is_purchased,
-            p.name, p.category, p.unit
+            p.name, p.category, p.unit,
+            gp.price_bdt AS current_price
      FROM shopping_list sl
      INNER JOIN products p ON sl.product_id = p.product_id
+     LEFT JOIN grocery_prices gp ON gp.product_id = p.product_id
      WHERE sl.user_id = :user_id AND sl.is_purchased = 1
      ORDER BY p.name ASC'
 );
@@ -152,6 +163,20 @@ $purchased_stmt->execute([':user_id' => $user_id]);
 $purchased_items = $purchased_stmt->fetchAll();
 
 $total_items = count($pending_items) + count($purchased_items);
+
+$pending_estimate = 0.0;
+foreach ($pending_items as $item) {
+    if ($item['current_price'] !== null) {
+        $pending_estimate += (float) $item['current_price'] * (float) $item['quantity'];
+    }
+}
+
+$purchased_estimate = 0.0;
+foreach ($purchased_items as $item) {
+    if ($item['current_price'] !== null) {
+        $purchased_estimate += (float) $item['current_price'] * (float) $item['quantity'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -166,7 +191,7 @@ $total_items = count($pending_items) + count($purchased_items);
         .shopping-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:20px}.shopping-card-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.shopping-card-title h2{margin:0;font-size:1rem;font-weight:700;color:var(--text-main)}.shopping-count{color:var(--text-muted);font-size:.82rem}
         .add-form{display:grid;grid-template-columns:minmax(0,1fr) 180px auto;gap:12px;align-items:end}.form-group label{display:block;margin-bottom:7px;color:var(--text-muted);font-size:.8rem;font-weight:600}.form-group select,.form-group input{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-input,var(--bg-card));color:var(--text-main);outline:none}.form-group select:focus,.form-group input:focus{border-color:var(--purple-400)}
         .shopping-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:var(--radius-sm);padding:10px 15px;font-size:.84rem;font-weight:700;text-decoration:none;cursor:pointer;transition:.2s;white-space:nowrap}.shopping-btn:hover{transform:translateY(-1px);opacity:.92}.btn-primary{background:var(--purple-600);color:#fff}.btn-danger{background:#dc3545;color:#fff}.btn-clear{background:#7f1d1d;color:#fecaca;border:1px solid #991b1b}.btn-clear:hover{background:#991b1b}
-        .item-list{display:flex;flex-direction:column;gap:10px}.shopping-item{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:14px 15px;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(255,255,255,.015);transition:.2s}.shopping-item:hover{border-color:var(--purple-400)}.item-main{display:flex;align-items:center;gap:12px;min-width:0}.item-check{width:20px;height:20px;min-width:20px;accent-color:#a855f7;cursor:pointer}.item-info{min-width:0}.item-info strong{display:block;color:var(--text-main);font-size:.9rem;transition:.2s}.item-meta{color:var(--text-muted);font-size:.76rem;margin-top:4px}.shopping-item.purchased{background:rgba(16,185,129,.035);border-color:rgba(16,185,129,.18)}.shopping-item.purchased .item-info strong{color:var(--text-soft);text-decoration:line-through;text-decoration-thickness:2px;opacity:.8}.shopping-item.purchased .item-meta{opacity:.7}.item-actions{display:flex;gap:8px;flex-wrap:wrap}.empty-state{text-align:center;padding:24px;color:var(--text-soft);font-size:.84rem;border:1px dashed var(--border);border-radius:var(--radius-sm)}.section-tools{display:flex;align-items:center;gap:10px}.summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}.summary-chip{padding:8px 12px;border:1px solid var(--border);border-radius:999px;color:var(--text-muted);background:rgba(255,255,255,.015);font-size:.8rem}.summary-chip strong{color:var(--text-main)}
+        .item-list{display:flex;flex-direction:column;gap:10px}.shopping-item{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:14px 15px;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(255,255,255,.015);transition:.2s}.shopping-item:hover{border-color:var(--purple-400)}.item-main{display:flex;align-items:center;gap:12px;min-width:0}.item-check{width:20px;height:20px;min-width:20px;accent-color:#a855f7;cursor:pointer}.item-info{min-width:0}.item-info strong{display:block;color:var(--text-main);font-size:.9rem;transition:.2s}.item-meta{color:var(--text-muted);font-size:.76rem;margin-top:4px}.item-price{color:#86efac;font-size:.76rem;margin-top:5px}.item-price.missing{color:var(--text-muted)}.shopping-item.purchased{background:rgba(16,185,129,.035);border-color:rgba(16,185,129,.18)}.shopping-item.purchased .item-info strong{color:var(--text-soft);text-decoration:line-through;text-decoration-thickness:2px;opacity:.8}.shopping-item.purchased .item-meta{opacity:.7}.item-actions{display:flex;gap:8px;flex-wrap:wrap}.empty-state{text-align:center;padding:24px;color:var(--text-soft);font-size:.84rem;border:1px dashed var(--border);border-radius:var(--radius-sm)}.section-tools{display:flex;align-items:center;gap:10px}.summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}.summary-chip{padding:8px 12px;border:1px solid var(--border);border-radius:999px;color:var(--text-muted);background:rgba(255,255,255,.015);font-size:.8rem}.summary-chip strong{color:var(--text-main)}.price-note{font-size:.75rem;color:var(--text-muted);margin-top:6px}
         @media(max-width:768px){.add-form{grid-template-columns:1fr}.shopping-item{align-items:flex-start}.item-actions{width:100%}.section-tools{align-items:flex-end;flex-direction:column}}
     </style>
 </head>
@@ -191,7 +216,7 @@ $total_items = count($pending_items) + count($purchased_items);
     </aside>
 
     <main class="main-content">
-        <div class="shopping-header"><h1>Shopping List</h1><p>Keep track of groceries you need to buy and mark them off as you shop.</p></div>
+        <div class="shopping-header"><h1>Shopping List</h1><p>Keep track of groceries you need to buy and see their latest tracked prices.</p></div>
         <div id="ajaxNotice" class="notice" style="display:none"></div>
         <?php if($message): ?><div class="notice"><?= htmlspecialchars($message) ?></div><?php endif; ?>
         <?php if($error): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
@@ -200,12 +225,13 @@ $total_items = count($pending_items) + count($purchased_items);
             <div class="summary-chip">Total items: <strong id="totalCount"><?= $total_items ?></strong></div>
             <div class="summary-chip">To buy: <strong id="pendingCount"><?= count($pending_items) ?></strong></div>
             <div class="summary-chip">Purchased: <strong id="purchasedCount"><?= count($purchased_items) ?></strong></div>
+            <div class="summary-chip">Estimated to buy: <strong>৳<?= number_format($pending_estimate, 2) ?></strong></div>
         </div>
 
         <section class="shopping-card">
             <div class="shopping-card-title"><h2>➕ Add Item</h2></div>
             <form method="POST" class="add-form">
-                <div class="form-group"><label for="product_id">Product</label><select id="product_id" name="product_id" required><option value="">Select a product</option><?php foreach($products as $product): ?><option value="<?= (int)$product['product_id'] ?>"><?= htmlspecialchars($product['name']) ?><?= !empty($product['category'])?' — '.htmlspecialchars($product['category']):'' ?></option><?php endforeach; ?></select></div>
+                <div class="form-group"><label for="product_id">Product</label><select id="product_id" name="product_id" required><option value="">Select a product</option><?php foreach($products as $product): ?><option value="<?= (int)$product['product_id'] ?>" <?= $prefill_product_id === (int)$product['product_id'] ? 'selected' : '' ?>><?= htmlspecialchars($product['name']) ?><?= !empty($product['category'])?' — '.htmlspecialchars($product['category']):'' ?><?= $product['current_price'] !== null ? ' — ৳'.number_format((float)$product['current_price'],2).'/'.htmlspecialchars($product['unit'] ?? 'unit') : '' ?></option><?php endforeach; ?></select><div class="price-note">Prices come from the current Price Tracker value.</div></div>
                 <div class="form-group"><label for="quantity">Quantity</label><input type="number" id="quantity" name="quantity" min="0.01" step="0.01" placeholder="e.g. 2" required></div>
                 <button class="shopping-btn btn-primary" type="submit" name="add_item">+ Add to List</button>
             </form>
@@ -215,7 +241,7 @@ $total_items = count($pending_items) + count($purchased_items);
             <div class="shopping-card-title"><h2>Pending Items</h2><span class="shopping-count" id="pendingSectionCount"><?= count($pending_items) ?> item(s)</span></div>
             <div class="item-list" id="pendingList">
                 <?php if(empty($pending_items)): ?><div class="empty-state" id="pendingEmpty">Your shopping list is empty. Add an item or use a recipe's missing ingredients option.</div><?php else: ?>
-                    <?php foreach($pending_items as $item): ?><div class="shopping-item" data-item-id="<?= (int)$item['list_item_id'] ?>"><div class="item-main"><input class="item-check" type="checkbox" aria-label="Mark <?= htmlspecialchars($item['name']) ?> as purchased" data-item-id="<?= (int)$item['list_item_id'] ?>"><div class="item-info"><strong><?= htmlspecialchars($item['name']) ?></strong><div class="item-meta">Quantity: <?= htmlspecialchars($item['quantity']) ?><?= !empty($item['unit'])?' '.htmlspecialchars($item['unit']):'' ?><?= !empty($item['category'])?' · '.htmlspecialchars($item['category']):'' ?></div></div></div><div class="item-actions"><a class="shopping-btn btn-danger" href="shopping.php?delete=<?= (int)$item['list_item_id'] ?>" onclick="return confirm('Remove this item from your shopping list?');">Delete</a></div></div><?php endforeach; ?>
+                    <?php foreach($pending_items as $item): $line_total = $item['current_price'] !== null ? (float)$item['current_price'] * (float)$item['quantity'] : null; ?><div class="shopping-item" data-item-id="<?= (int)$item['list_item_id'] ?>"><div class="item-main"><input class="item-check" type="checkbox" aria-label="Mark <?= htmlspecialchars($item['name']) ?> as purchased" data-item-id="<?= (int)$item['list_item_id'] ?>"><div class="item-info"><strong><?= htmlspecialchars($item['name']) ?></strong><div class="item-meta">Quantity: <?= htmlspecialchars($item['quantity']) ?><?= !empty($item['unit'])?' '.htmlspecialchars($item['unit']):'' ?><?= !empty($item['category'])?' · '.htmlspecialchars($item['category']):'' ?></div><?php if($item['current_price'] !== null): ?><div class="item-price">Latest price: ৳<?= number_format((float)$item['current_price'],2) ?>/<?= htmlspecialchars($item['unit'] ?? 'unit') ?> · Estimated: ৳<?= number_format($line_total,2) ?></div><?php else: ?><div class="item-price missing">No current price tracked for this product.</div><?php endif; ?></div></div><div class="item-actions"><a class="shopping-btn btn-danger" href="shopping.php?delete=<?= (int)$item['list_item_id'] ?>" onclick="return confirm('Remove this item from your shopping list?');">Delete</a></div></div><?php endforeach; ?>
                 <?php endif; ?>
             </div>
         </section>
@@ -224,7 +250,7 @@ $total_items = count($pending_items) + count($purchased_items);
             <div class="shopping-card-title"><div><h2>Purchased Items</h2><span class="shopping-count" id="purchasedSectionCount"><?= count($purchased_items) ?> item(s)</span></div><div class="section-tools"><button type="button" class="shopping-btn btn-clear" id="clearDoneBtn" style="<?= empty($purchased_items)?'display:none':'' ?>">Clear Done</button></div></div>
             <div class="item-list" id="purchasedList">
                 <?php if(empty($purchased_items)): ?><div class="empty-state" id="purchasedEmpty">No purchased items yet.</div><?php else: ?>
-                    <?php foreach($purchased_items as $item): ?><div class="shopping-item purchased" data-item-id="<?= (int)$item['list_item_id'] ?>"><div class="item-main"><input class="item-check" type="checkbox" checked aria-label="Unmark <?= htmlspecialchars($item['name']) ?> as purchased" data-item-id="<?= (int)$item['list_item_id'] ?>"><div class="item-info"><strong><?= htmlspecialchars($item['name']) ?></strong><div class="item-meta">Quantity: <?= htmlspecialchars($item['quantity']) ?><?= !empty($item['unit'])?' '.htmlspecialchars($item['unit']):'' ?><?= !empty($item['category'])?' · '.htmlspecialchars($item['category']):'' ?></div></div></div><div class="item-actions"><a class="shopping-btn btn-danger" href="shopping.php?delete=<?= (int)$item['list_item_id'] ?>" onclick="return confirm('Remove this item from your shopping list?');">Delete</a></div></div><?php endforeach; ?>
+                    <?php foreach($purchased_items as $item): $line_total = $item['current_price'] !== null ? (float)$item['current_price'] * (float)$item['quantity'] : null; ?><div class="shopping-item purchased" data-item-id="<?= (int)$item['list_item_id'] ?>"><div class="item-main"><input class="item-check" type="checkbox" checked aria-label="Unmark <?= htmlspecialchars($item['name']) ?> as purchased" data-item-id="<?= (int)$item['list_item_id'] ?>"><div class="item-info"><strong><?= htmlspecialchars($item['name']) ?></strong><div class="item-meta">Quantity: <?= htmlspecialchars($item['quantity']) ?><?= !empty($item['unit'])?' '.htmlspecialchars($item['unit']):'' ?><?= !empty($item['category'])?' · '.htmlspecialchars($item['category']):'' ?></div><?php if($item['current_price'] !== null): ?><div class="item-price">Latest tracked price: ৳<?= number_format((float)$item['current_price'],2) ?>/<?= htmlspecialchars($item['unit'] ?? 'unit') ?> · Estimated: ৳<?= number_format($line_total,2) ?></div><?php else: ?><div class="item-price missing">No current price tracked for this product.</div><?php endif; ?></div></div><div class="item-actions"><a class="shopping-btn btn-danger" href="shopping.php?delete=<?= (int)$item['list_item_id'] ?>" onclick="return confirm('Remove this item from your shopping list?');">Delete</a></div></div><?php endforeach; ?>
                 <?php endif; ?>
             </div>
         </section>
