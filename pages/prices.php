@@ -28,12 +28,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_price'])) {
             $pdo->beginTransaction();
 
             $current = $pdo->prepare(
-                'SELECT price_id FROM grocery_prices WHERE product_id = :product_id LIMIT 1'
+                'SELECT price_id, price_bdt, updated_at FROM grocery_prices
+                 WHERE product_id = :product_id LIMIT 1'
             );
             $current->execute([':product_id' => $product_id]);
             $existing = $current->fetch();
 
             if ($existing) {
+                // If an older current price was never recorded in price_history,
+                // preserve it before replacing the current price.
+                $existing_date = date('Y-m-d', strtotime($existing['updated_at']));
+
+                if ($existing_date < $today) {
+                    $legacy_history = $pdo->prepare(
+                        'SELECT history_id FROM price_history
+                         WHERE product_id = :product_id AND recorded_date = :recorded_date
+                         LIMIT 1'
+                    );
+                    $legacy_history->execute([
+                        ':product_id' => $product_id,
+                        ':recorded_date' => $existing_date
+                    ]);
+
+                    if (!$legacy_history->fetch()) {
+                        $legacy_insert = $pdo->prepare(
+                            'INSERT INTO price_history (product_id, price_bdt, recorded_date)
+                             VALUES (:product_id, :price_bdt, :recorded_date)'
+                        );
+                        $legacy_insert->execute([
+                            ':product_id' => $product_id,
+                            ':price_bdt' => (float) $existing['price_bdt'],
+                            ':recorded_date' => $existing_date
+                        ]);
+                    }
+                }
+
                 $stmt = $pdo->prepare(
                     'UPDATE grocery_prices
                      SET price_bdt = :price_bdt, updated_at = CURRENT_TIMESTAMP
@@ -99,36 +128,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_price'])) {
     }
 }
 
-// Delete a current price and its history for the selected product.
+// Delete only the current price. Historical price records are preserved permanently.
 if (isset($_GET['delete'])) {
     $price_id = (int) $_GET['delete'];
 
     try {
-        $stmt = $pdo->prepare('SELECT product_id FROM grocery_prices WHERE price_id = :price_id LIMIT 1');
+        $stmt = $pdo->prepare('SELECT price_id FROM grocery_prices WHERE price_id = :price_id LIMIT 1');
         $stmt->execute([':price_id' => $price_id]);
         $price_row = $stmt->fetch();
 
         if ($price_row) {
-            $pdo->beginTransaction();
-            $delete_history = $pdo->prepare('DELETE FROM price_history WHERE product_id = :product_id');
-            $delete_history->execute([':product_id' => (int) $price_row['product_id']]);
             $delete_current = $pdo->prepare('DELETE FROM grocery_prices WHERE price_id = :price_id');
             $delete_current->execute([':price_id' => $price_id]);
-            $pdo->commit();
         }
 
         header('Location: prices.php?status=deleted');
         exit();
     } catch (PDOException $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
         $error = 'Unable to delete the price record.';
     }
 }
 
 if (isset($_GET['status']) && $_GET['status'] === 'deleted') {
-    $message = 'Price record and its history were removed successfully.';
+    $message = 'Current price removed successfully. Price history was preserved.';
 }
 
 $products = $pdo->query(
@@ -274,7 +296,7 @@ $history_stmt = $pdo->prepare(
             <td><?php if ($difference === null): ?><span class="change same">No comparison yet</span><?php elseif ($difference < 0): ?><span class="change down">▼ ৳<?php echo number_format(abs($difference),2); ?> cheaper<br>(<?php echo number_format(abs($percentage),2); ?>% lower)</span><?php elseif ($difference > 0): ?><span class="change up">▲ ৳<?php echo number_format($difference,2); ?> higher<br>(<?php echo number_format($percentage,2); ?>% higher)</span><?php else: ?><span class="change same">● No change</span><?php endif; ?></td>
             <td class="meta"><?php echo htmlspecialchars($item['unit'] ?: '—'); ?></td>
             <td class="meta"><?php echo htmlspecialchars(date('d M Y, h:i A',strtotime($item['updated_at']))); ?></td>
-            <td><div class="actions"><a class="btn btn-danger" href="prices.php?delete=<?php echo (int)$item['price_id']; ?>" onclick="return confirm('Delete this price and its history?');">Delete</a></div></td>
+            <td><div class="actions"><a class="btn btn-danger" href="prices.php?delete=<?php echo (int)$item['price_id']; ?>" onclick="return confirm('Delete this current price? Historical price data will be preserved.');">Delete</a></div></td>
         </tr>
         <?php endforeach; ?></tbody></table></div><?php endif; ?>
     </section>
