@@ -27,7 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_price'])) {
         try {
             $pdo->beginTransaction();
 
-            // Keep the existing current-price table synchronized.
             $current = $pdo->prepare(
                 'SELECT price_id FROM grocery_prices WHERE product_id = :product_id LIMIT 1'
             );
@@ -176,7 +175,7 @@ $price_stmt = $pdo->prepare($sql);
 $price_stmt->execute($params);
 $prices = $price_stmt->fetchAll();
 
-// Seven-day history for the optional product detail cards.
+// Seven-day history for the visual price trend cards.
 $history_stmt = $pdo->prepare(
     'SELECT ph.price_bdt, ph.recorded_date
      FROM price_history ph
@@ -212,8 +211,20 @@ $history_stmt = $pdo->prepare(
         .price { color:var(--green); font-weight:700; } .meta { color:var(--muted); font-size:13px; } .actions { display:flex; gap:8px; flex-wrap:wrap; }
         .change { display:inline-block; margin-top:4px; font-size:12px; font-weight:700; } .change.down { color:var(--green); } .change.up { color:var(--red); } .change.same { color:var(--muted); }
         .empty { padding:28px; text-align:center; color:var(--muted); border:1px dashed #4b2670; border-radius:10px; }
+        .trend-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; }
+        .trend-card { background:#120922; border:1px solid #3b1b68; border-radius:12px; padding:18px; }
+        .trend-header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:16px; }
+        .trend-title { margin:0; font-size:18px; } .trend-current { color:var(--green); font-size:18px; font-weight:700; white-space:nowrap; }
+        .trend-subtitle { margin:4px 0 0; color:var(--muted); font-size:12px; }
+        .trend-chart { height:150px; display:flex; align-items:flex-end; gap:9px; padding:12px 4px 0; border-bottom:1px solid #3b1b68; }
+        .trend-point { flex:1; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; min-width:0; }
+        .trend-value { color:#eee7f8; font-size:11px; margin-bottom:6px; white-space:nowrap; }
+        .trend-bar { width:100%; max-width:34px; min-height:8px; border-radius:6px 6px 2px 2px; background:linear-gradient(to top,#7c3aed,#c084fc); transition:height .2s ease; }
+        .trend-date { color:var(--muted); font-size:10px; margin-top:7px; white-space:nowrap; }
+        .trend-note { margin:14px 0 0; color:var(--muted); font-size:12px; }
+        .trend-note strong { color:#eee7f8; }
         .mobile-menu { display:none; position:fixed; top:14px; left:14px; z-index:1100; padding:9px 12px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:#fff; cursor:pointer; }
-        @media (max-width:850px) { .sidebar { transform:translateX(-100%); transition:transform .25s ease; } .sidebar.open { transform:translateX(0); } .mobile-menu { display:block; } .main { margin-left:0; padding:75px 18px 25px; } .form-grid,.filters { grid-template-columns:1fr; } }
+        @media (max-width:850px) { .sidebar { transform:translateX(-100%); transition:transform .25s ease; } .sidebar.open { transform:translateX(0); } .mobile-menu { display:block; } .main { margin-left:0; padding:75px 18px 25px; } .form-grid,.filters { grid-template-columns:1fr; } .trend-grid { grid-template-columns:1fr; } }
     </style>
 </head>
 <body>
@@ -267,5 +278,67 @@ $history_stmt = $pdo->prepare(
         </tr>
         <?php endforeach; ?></tbody></table></div><?php endif; ?>
     </section>
+
+    <section class="card">
+        <h2>7-Day Price Trend</h2>
+        <?php if (empty($prices)): ?>
+            <div class="empty">Add a current price to see its historical trend here.</div>
+        <?php else: ?>
+            <div class="trend-grid">
+            <?php foreach ($prices as $item):
+                $history_stmt->execute([':product_id' => (int)$item['product_id']]);
+                $history_rows = $history_stmt->fetchAll();
+                $history_rows = array_reverse($history_rows);
+                $max_history_price = 0;
+                foreach ($history_rows as $history_item) {
+                    $max_history_price = max($max_history_price, (float)$history_item['price_bdt']);
+                }
+                $history_count = count($history_rows);
+                $first_history_price = $history_count > 0 ? (float)$history_rows[0]['price_bdt'] : null;
+                $last_history_price = $history_count > 0 ? (float)$history_rows[$history_count - 1]['price_bdt'] : null;
+                $trend_difference = ($first_history_price !== null && $last_history_price !== null) ? $last_history_price - $first_history_price : 0;
+            ?>
+                <div class="trend-card">
+                    <div class="trend-header">
+                        <div>
+                            <h3 class="trend-title"><?php echo htmlspecialchars($item['name']); ?></h3>
+                            <p class="trend-subtitle">Last <?php echo $history_count; ?> recorded day<?php echo $history_count === 1 ? '' : 's'; ?></p>
+                        </div>
+                        <div class="trend-current">৳<?php echo number_format((float)$item['price_bdt'], 2); ?></div>
+                    </div>
+
+                    <?php if ($history_count > 0): ?>
+                        <div class="trend-chart" aria-label="7-day price trend for <?php echo htmlspecialchars($item['name']); ?>">
+                            <?php foreach ($history_rows as $history_item):
+                                $history_price = (float)$history_item['price_bdt'];
+                                $bar_height = $max_history_price > 0 ? max(12, ($history_price / $max_history_price) * 100) : 12;
+                            ?>
+                                <div class="trend-point">
+                                    <div class="trend-value">৳<?php echo number_format($history_price, 0); ?></div>
+                                    <div class="trend-bar" style="height:<?php echo number_format($bar_height, 2, '.', ''); ?>%"></div>
+                                    <div class="trend-date"><?php echo htmlspecialchars(date('d M', strtotime($history_item['recorded_date']))); ?></div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <p class="trend-note">
+                            <?php if ($history_count === 1): ?>
+                                <strong>First recorded price:</strong> no trend comparison yet.
+                            <?php elseif ($trend_difference < 0): ?>
+                                <strong>Trend:</strong> price is ৳<?php echo number_format(abs($trend_difference), 2); ?> lower than the first recorded day in this view.
+                            <?php elseif ($trend_difference > 0): ?>
+                                <strong>Trend:</strong> price is ৳<?php echo number_format($trend_difference, 2); ?> higher than the first recorded day in this view.
+                            <?php else: ?>
+                                <strong>Trend:</strong> price is unchanged from the first recorded day in this view.
+                            <?php endif; ?>
+                        </p>
+                    <?php else: ?>
+                        <div class="empty">No historical prices available yet.</div>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </section>
 </div></main>
-</body></html>
+</body>
+</html>
