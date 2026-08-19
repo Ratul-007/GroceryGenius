@@ -13,7 +13,7 @@ $error = '';
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $category = isset($_GET['category']) ? trim($_GET['category']) : '';
 
-// Save today's price. If today's record already exists, update it instead of creating a duplicate.
+// Save today's price. Historical records are append-only when the price changes.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_price'])) {
     $product_id = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
     $price_bdt = isset($_POST['price_bdt']) ? trim($_POST['price_bdt']) : '';
@@ -34,33 +34,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_price'])) {
             $current->execute([':product_id' => $product_id]);
             $existing = $current->fetch();
 
+            // Find the latest historical record for this product. This lets us
+            // avoid duplicate history rows when the same price is saved again.
+            $latest_history = $pdo->prepare(
+                'SELECT history_id, price_bdt, recorded_date
+                 FROM price_history
+                 WHERE product_id = :product_id
+                 ORDER BY recorded_date DESC, history_id DESC
+                 LIMIT 1'
+            );
+            $latest_history->execute([':product_id' => $product_id]);
+            $latest = $latest_history->fetch();
+
             if ($existing) {
-                // If an older current price was never recorded in price_history,
-                // preserve it before replacing the current price.
+                $existing_price = (float) $existing['price_bdt'];
                 $existing_date = date('Y-m-d', strtotime($existing['updated_at']));
 
-                if ($existing_date < $today) {
-                    $legacy_history = $pdo->prepare(
-                        'SELECT history_id FROM price_history
-                         WHERE product_id = :product_id AND recorded_date = :recorded_date
-                         LIMIT 1'
+                // Preserve the old current price if it is not already represented
+                // by the latest history record. This also handles legacy data.
+                if (
+                    !$latest ||
+                    (float) $latest['price_bdt'] !== $existing_price ||
+                    $latest['recorded_date'] !== $existing_date
+                ) {
+                    $legacy_insert = $pdo->prepare(
+                        'INSERT INTO price_history (product_id, price_bdt, recorded_date)
+                         VALUES (:product_id, :price_bdt, :recorded_date)'
                     );
-                    $legacy_history->execute([
+                    $legacy_insert->execute([
                         ':product_id' => $product_id,
+                        ':price_bdt' => $existing_price,
                         ':recorded_date' => $existing_date
                     ]);
-
-                    if (!$legacy_history->fetch()) {
-                        $legacy_insert = $pdo->prepare(
-                            'INSERT INTO price_history (product_id, price_bdt, recorded_date)
-                             VALUES (:product_id, :price_bdt, :recorded_date)'
-                        );
-                        $legacy_insert->execute([
-                            ':product_id' => $product_id,
-                            ':price_bdt' => (float) $existing['price_bdt'],
-                            ':recorded_date' => $existing_date
-                        ]);
-                    }
                 }
 
                 $stmt = $pdo->prepare(
@@ -83,34 +88,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_price'])) {
                 ]);
             }
 
-            // Keep one historical price record per product per day.
-            $history = $pdo->prepare(
-                'SELECT history_id FROM price_history
-                 WHERE product_id = :product_id AND recorded_date = :recorded_date
+            // Record a new history entry only when the price actually changes.
+            // Multiple price changes on the same day are intentionally preserved.
+            $latest_after_current = $pdo->prepare(
+                'SELECT history_id, price_bdt
+                 FROM price_history
+                 WHERE product_id = :product_id
+                 ORDER BY recorded_date DESC, history_id DESC
                  LIMIT 1'
             );
-            $history->execute([
-                ':product_id' => $product_id,
-                ':recorded_date' => $today
-            ]);
-            $history_row = $history->fetch();
+            $latest_after_current->execute([':product_id' => $product_id]);
+            $latest_row = $latest_after_current->fetch();
 
-            if ($history_row) {
-                $stmt = $pdo->prepare(
-                    'UPDATE price_history
-                     SET price_bdt = :price_bdt, created_at = CURRENT_TIMESTAMP
-                     WHERE history_id = :history_id'
-                );
-                $stmt->execute([
-                    ':price_bdt' => $price_bdt,
-                    ':history_id' => (int) $history_row['history_id']
-                ]);
-            } else {
-                $stmt = $pdo->prepare(
+            if (!$latest_row || (float) $latest_row['price_bdt'] !== $price_bdt) {
+                $history_insert = $pdo->prepare(
                     'INSERT INTO price_history (product_id, price_bdt, recorded_date)
                      VALUES (:product_id, :price_bdt, :recorded_date)'
                 );
-                $stmt->execute([
+                $history_insert->execute([
                     ':product_id' => $product_id,
                     ':price_bdt' => $price_bdt,
                     ':recorded_date' => $today
@@ -197,12 +192,21 @@ $price_stmt = $pdo->prepare($sql);
 $price_stmt->execute($params);
 $prices = $price_stmt->fetchAll();
 
-// Seven-day history for the visual price trend cards.
+// Seven-day visual history: use the latest price entry for each day so
+// multiple same-day price changes do not create duplicate chart bars.
 $history_stmt = $pdo->prepare(
     'SELECT ph.price_bdt, ph.recorded_date
      FROM price_history ph
      WHERE ph.product_id = :product_id
-     ORDER BY ph.recorded_date DESC, ph.history_id DESC
+       AND ph.history_id = (
+           SELECT ph2.history_id
+           FROM price_history ph2
+           WHERE ph2.product_id = ph.product_id
+             AND ph2.recorded_date = ph.recorded_date
+           ORDER BY ph2.history_id DESC
+           LIMIT 1
+       )
+     ORDER BY ph.recorded_date DESC
      LIMIT 7'
 );
 ?>
