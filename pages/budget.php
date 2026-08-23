@@ -7,7 +7,10 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$user_id = (int) $_SESSION['user_id'];
+$user_id       = (int) $_SESSION['user_id'];
+$user_name     = $_SESSION['user_name'] ?? 'User';
+$avatar_letter = strtoupper(substr($user_name, 0, 1));
+
 $current_month = date('Y-m');
 $message = '';
 $error = '';
@@ -24,10 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_budget'])) {
         $check = $pdo->prepare(
             'SELECT budget_id FROM budget WHERE user_id = :user_id AND month = :month LIMIT 1'
         );
-        $check->execute([
-            ':user_id' => $user_id,
-            ':month' => $current_month
-        ]);
+        $check->execute([':user_id' => $user_id, ':month' => $current_month]);
         $existing_budget = $check->fetch();
 
         if ($existing_budget) {
@@ -37,8 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_budget'])) {
             );
             $stmt->execute([
                 ':limit_amount' => $limit_amount,
-                ':budget_id' => (int) $existing_budget['budget_id'],
-                ':user_id' => $user_id
+                ':budget_id'    => (int) $existing_budget['budget_id'],
+                ':user_id'      => $user_id
             ]);
             $message = 'Monthly budget updated successfully.';
         } else {
@@ -47,8 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_budget'])) {
                  VALUES (:user_id, :month, :limit_amount, 0)'
             );
             $stmt->execute([
-                ':user_id' => $user_id,
-                ':month' => $current_month,
+                ':user_id'      => $user_id,
+                ':month'        => $current_month,
                 ':limit_amount' => $limit_amount
             ]);
             $message = 'Monthly budget saved successfully.';
@@ -67,29 +67,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_expense'])) {
 
         $budget_stmt = $pdo->prepare(
             'SELECT budget_id, limit_amount, spent_amount
-             FROM budget
-             WHERE user_id = :user_id AND month = :month
-             LIMIT 1'
+             FROM budget WHERE user_id = :user_id AND month = :month LIMIT 1'
         );
-        $budget_stmt->execute([
-            ':user_id' => $user_id,
-            ':month' => $current_month
-        ]);
+        $budget_stmt->execute([':user_id' => $user_id, ':month' => $current_month]);
         $current_budget = $budget_stmt->fetch();
 
         if (!$current_budget) {
             $error = 'Please set your monthly budget before adding an expense.';
         } else {
             $new_spent = (float) $current_budget['spent_amount'] + $expense_amount;
-
             $stmt = $pdo->prepare(
                 'UPDATE budget SET spent_amount = :spent_amount
                  WHERE budget_id = :budget_id AND user_id = :user_id'
             );
             $stmt->execute([
                 ':spent_amount' => $new_spent,
-                ':budget_id' => (int) $current_budget['budget_id'],
-                ':user_id' => $user_id
+                ':budget_id'    => (int) $current_budget['budget_id'],
+                ':user_id'      => $user_id
             ]);
             $message = 'Expense added successfully.';
         }
@@ -99,250 +93,157 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_expense'])) {
 // Load the current month's budget.
 $budget_stmt = $pdo->prepare(
     'SELECT budget_id, month, limit_amount, spent_amount
-     FROM budget
-     WHERE user_id = :user_id AND month = :month
-     LIMIT 1'
+     FROM budget WHERE user_id = :user_id AND month = :month LIMIT 1'
 );
-$budget_stmt->execute([
-    ':user_id' => $user_id,
-    ':month' => $current_month
-]);
+$budget_stmt->execute([':user_id' => $user_id, ':month' => $current_month]);
 $budget = $budget_stmt->fetch();
 
-$spent = $budget ? (float) $budget['spent_amount'] : 0;
-$limit = $budget ? (float) $budget['limit_amount'] : 0;
-$pct = $limit > 0 ? ($spent / $limit) * 100 : 0;
+$spent       = $budget ? (float) $budget['spent_amount'] : 0;
+$limit       = $budget ? (float) $budget['limit_amount'] : 0;
+$pct         = $limit > 0 ? ($spent / $limit) * 100 : 0;
 $display_pct = round($pct);
-$bar_width = min(max($pct, 0), 100);
-$color = $pct < 60 ? '#4ade80' : ($pct < 85 ? '#facc15' : '#f87171');
-$remaining = $limit - $spent;
+$bar_width   = min(max($pct, 0), 100);
+$color       = $pct < 60 ? '#10b981' : ($pct < 85 ? '#f59e0b' : '#ef4444');
+$remaining   = $limit - $spent;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budget Tracker - GroceryGenius</title>
+    <title>Budget Tracker — GroceryGenius</title>
+    <link rel="stylesheet" href="../assets/css/style.css"/>
     <style>
-        :root {
-            --bg: #0d0718;
-            --sidebar: #120922;
-            --card: #170d2b;
-            --border: #3b1b68;
-            --text: #f5f0ff;
-            --muted: #b8a8cf;
-            --purple: #a855f7;
-            --purple-light: #c084fc;
-        }
+        .remaining-positive { color: var(--success); }
+        .remaining-negative { color: var(--danger); }
 
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            background: var(--bg);
-            color: var(--text);
-            font-family: Arial, Helvetica, sans-serif;
-        }
-
-        .sidebar {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 240px;
-            height: 100vh;
-            padding: 24px 16px;
-            background: var(--sidebar);
-            border-right: 1px solid var(--border);
-            z-index: 1000;
-        }
-        .brand { padding: 4px 12px 24px; font-size: 23px; font-weight: 700; }
-        .brand span { color: var(--purple-light); }
-        .nav a {
-            display: block;
-            padding: 12px 14px;
-            margin: 5px 0;
-            color: var(--muted);
-            text-decoration: none;
-            border-radius: 9px;
-            transition: .2s;
-        }
-        .nav a:hover, .nav a.active { background: #24113e; color: #fff; }
-        .nav a.active { border-left: 3px solid var(--purple); }
-        .logout { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px; }
-        .logout a { color: #f87171; }
-
-        .main {
-            margin-left: 240px;
-            min-height: 100vh;
-            padding: 34px;
-        }
-        .container { max-width: 1100px; margin: 0 auto; }
-        .page-header { margin-bottom: 25px; }
-        .page-header h1 { margin: 0 0 7px; font-size: 30px; }
-        .page-header p { margin: 0; color: var(--muted); }
-
-        .notice, .error {
-            padding: 13px 16px;
-            border-radius: 9px;
-            margin-bottom: 18px;
-        }
-        .notice { background: #123421; border: 1px solid #246b3e; color: #86efac; }
-        .error { background: #3a151d; border: 1px solid #7f1d2d; color: #fca5a5; }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 22px;
-        }
-        .stat-card, .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 15px;
-            padding: 22px;
-        }
-        .stat-label { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
-        .stat-value { font-size: 25px; font-weight: 700; }
-        .remaining-positive { color: #4ade80; }
-        .remaining-negative { color: #f87171; }
-
-        .card { margin-bottom: 22px; }
-        .card h2 { margin: 0 0 18px; font-size: 20px; }
         .form-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: end; }
-        .form-group label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 14px; }
-        input[type="number"] {
-            width: 100%;
-            padding: 12px 13px;
-            background: #10091d;
-            color: var(--text);
-            border: 1px solid #4b2670;
-            border-radius: 8px;
-            outline: none;
-        }
-        input[type="number"]:focus { border-color: var(--purple); }
-        .btn {
-            padding: 12px 17px;
-            border: 0;
-            border-radius: 8px;
-            background: var(--purple);
-            color: #fff;
-            font-weight: 700;
-            cursor: pointer;
-        }
-        .btn:hover { opacity: .9; }
 
-        .progress-card { margin-bottom: 22px; }
+        .card + .card { margin-top: 20px; }
+        .card h2 { margin: 0 0 18px; font-size: 1.1rem; color: var(--text-main); }
+
         .progress-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 13px;
         }
         .progress-header h2 { margin: 0; }
-        .progress-percent { color: var(--purple-light); font-weight: 700; }
+        .progress-percent { color: var(--purple-300); font-weight: 700; }
+
         .budget-bar-wrap {
-            width: 100%;
-            height: 31px;
-            background: #291542;
-            border-radius: 999px;
-            overflow: hidden;
+            width: 100%; height: 31px;
+            background: rgba(61,18,120,0.3);
+            border-radius: 999px; overflow: hidden;
         }
         .budget-bar {
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            padding-right: 10px;
-            min-width: 0;
-            border-radius: 999px;
-            color: #171020;
-            font-weight: 700;
-            transition: width .4s ease, background .4s ease;
+            height: 100%; display: flex; align-items: center; justify-content: flex-end;
+            padding-right: 10px; min-width: 0; border-radius: 999px;
+            color: #171020; font-weight: 700;
+            transition: width 0.4s ease, background 0.4s ease;
         }
-        .spent-text { color: var(--muted); margin: 13px 0 0; }
-        .warning { margin-top: 12px; color: #f87171; font-weight: 700; }
+        .spent-text { color: var(--text-muted); margin: 13px 0 0; }
+        .warning { margin-top: 12px; color: var(--danger); font-weight: 700; }
 
-        .mobile-menu {
-            display: none;
-            position: fixed;
-            top: 14px;
-            left: 14px;
-            z-index: 1100;
-            padding: 9px 12px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: var(--card);
-            color: #fff;
-            cursor: pointer;
-        }
-
-        @media (max-width: 850px) {
-            .sidebar { transform: translateX(-100%); transition: transform .25s ease; }
-            .sidebar.open { transform: translateX(0); }
-            .mobile-menu { display: block; }
-            .main { margin-left: 0; padding: 75px 18px 25px; }
-            .grid { grid-template-columns: 1fr; }
+        @media (max-width: 768px) {
             .form-row { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-<button class="mobile-menu" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
 
-<aside class="sidebar">
-    <div class="brand">Grocery<span>Genius</span></div>
-    <nav class="nav">
-        <a href="dashboard.php">Dashboard</a>
-        <a href="pantry.php">Pantry</a>
-        <a href="recipes.php">Recipes</a>
-        <a href="shopping.php">Shopping List</a>
-        <a href="budget.php" class="active">Budget</a>
-        <a href="prices.php">Price Tracker</a>
-    </nav>
-    <div class="logout nav">
-        <a href="logout.php">Logout</a>
-    </div>
-</aside>
+<button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">
+    <span></span><span></span><span></span>
+</button>
 
-<main class="main">
-    <div class="container">
+<div class="app-layout">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <div class="logo-text">🛒 GroceryGenius</div>
+            <div class="logo-sub">Smart grocery management</div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-label">Main</div>
+            <a href="dashboard.php" class="nav-item"><span class="nav-icon">🏠</span> Dashboard</a>
+            <a href="pantry.php" class="nav-item"><span class="nav-icon">🥦</span> Pantry</a>
+            <a href="recipes.php" class="nav-item"><span class="nav-icon">🍳</span> Recipes</a>
+            <a href="shopping.php" class="nav-item"><span class="nav-icon">🛍️</span> Shopping List</a>
+            <a href="cooking_history.php" class="nav-item"><span class="nav-icon">📖</span> Cooking History</a>
+
+            <div class="nav-label">Finance</div>
+            <a href="budget.php" class="nav-item active"><span class="nav-icon">💰</span> Budget</a>
+            <a href="expense_history.php" class="nav-item"><span class="nav-icon">🧾</span> Expense History</a>
+            <a href="monthly_report.php" class="nav-item"><span class="nav-icon">📊</span> Monthly Report</a>
+            <a href="prices.php" class="nav-item"><span class="nav-icon">📈</span> Price Tracker</a>
+
+            <div class="nav-label">Account</div>
+            <a href="profile.php" class="nav-item"><span class="nav-icon">👤</span> Profile</a>
+            <a href="logout.php" class="nav-item"><span class="nav-icon">🚪</span> Logout</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar"><?= htmlspecialchars($avatar_letter) ?></div>
+                <div>
+                    <div class="user-name"><?= htmlspecialchars($user_name) ?></div>
+                    <div class="user-role">Member</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+
         <div class="page-header">
-            <h1>Budget Tracker</h1>
-            <p>Manage your grocery budget and keep track of your monthly spending.</p>
+            <div class="page-title">💰 Budget Tracker</div>
+            <div class="page-sub">Manage your grocery budget and keep track of your monthly spending.</div>
         </div>
 
         <?php if ($message): ?>
-            <div class="notice"><?php echo htmlspecialchars($message); ?></div>
+            <div class="alert alert-success">✅ <?= htmlspecialchars($message) ?></div>
         <?php endif; ?>
         <?php if ($error): ?>
-            <div class="error"><?php echo htmlspecialchars($error); ?></div>
+            <div class="alert alert-danger">⚠️ <?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
-        <div class="grid">
+        <div class="stat-grid">
             <div class="stat-card">
-                <div class="stat-label">Monthly Budget</div>
-                <div class="stat-value">৳<?php echo number_format($limit, 2); ?></div>
+                <div class="stat-icon purple">💰</div>
+                <div>
+                    <div class="stat-val">৳<?= number_format($limit, 2) ?></div>
+                    <div class="stat-label">Monthly Budget</div>
+                </div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Spent</div>
-                <div class="stat-value">৳<?php echo number_format($spent, 2); ?></div>
+                <div class="stat-icon orange">🧾</div>
+                <div>
+                    <div class="stat-val">৳<?= number_format($spent, 2) ?></div>
+                    <div class="stat-label">Spent</div>
+                </div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Remaining</div>
-                <div class="stat-value <?php echo $remaining < 0 ? 'remaining-negative' : 'remaining-positive'; ?>">
-                    ৳<?php echo number_format($remaining, 2); ?>
+                <div class="stat-icon <?= $remaining < 0 ? 'red' : 'green' ?>">
+                    <?= $remaining < 0 ? '⚠️' : '✅' ?>
+                </div>
+                <div>
+                    <div class="stat-val <?= $remaining < 0 ? 'remaining-negative' : 'remaining-positive' ?>">
+                        ৳<?= number_format($remaining, 2) ?>
+                    </div>
+                    <div class="stat-label">Remaining</div>
                 </div>
             </div>
         </div>
 
         <section class="card">
-            <h2><?php echo $budget ? 'Update Monthly Budget' : 'Set Monthly Budget'; ?></h2>
+            <h2><?= $budget ? 'Update Monthly Budget' : 'Set Monthly Budget' ?></h2>
             <form method="POST">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="limit_amount">Budget limit for <?php echo htmlspecialchars(date('F Y')); ?></label>
-                        <input type="number" id="limit_amount" name="limit_amount" min="0.01" step="0.01" value="<?php echo $limit > 0 ? htmlspecialchars($limit) : ''; ?>" placeholder="e.g. 10000" required>
+                        <label for="limit_amount">Budget limit for <?= htmlspecialchars(date('F Y')) ?></label>
+                        <input type="number" id="limit_amount" name="limit_amount" class="form-control"
+                               min="0.01" step="0.01"
+                               value="<?= $limit > 0 ? htmlspecialchars($limit) : '' ?>"
+                               placeholder="e.g. 10000" required>
                     </div>
-                    <button class="btn" type="submit" name="save_budget">Save Budget</button>
+                    <button class="btn btn-primary" type="submit" name="save_budget">Save Budget</button>
                 </div>
             </form>
         </section>
@@ -353,36 +254,142 @@ $remaining = $limit - $spent;
                 <div class="form-row">
                     <div class="form-group">
                         <label for="expense_amount">Expense amount</label>
-                        <input type="number" id="expense_amount" name="expense_amount" min="0.01" step="0.01" placeholder="e.g. 500" required>
+                        <input type="number" id="expense_amount" name="expense_amount" class="form-control"
+                               min="0.01" step="0.01" placeholder="e.g. 500" required>
                     </div>
-                    <button class="btn" type="submit" name="add_expense">Add Expense</button>
+                    <button class="btn btn-primary" type="submit" name="add_expense">Add Expense</button>
                 </div>
             </form>
         </section>
 
-        <section class="card progress-card">
+        <section class="card">
             <div class="progress-header">
                 <h2>Budget Progress</h2>
-                <span class="progress-percent"><?php echo $display_pct; ?>%</span>
+                <span class="progress-percent"><?= $display_pct ?>%</span>
             </div>
 
             <div class="budget-bar-wrap">
-                <div class="budget-bar" style="width: <?php echo $bar_width; ?>%; background: <?php echo $color; ?>;">
-                    <?php echo $display_pct; ?>%
+                <div class="budget-bar" style="width: <?= $bar_width ?>%; background: <?= $color ?>;">
+                    <?= $display_pct ?>%
                 </div>
             </div>
 
             <p class="spent-text">
-                Spent: ৳<?php echo number_format($spent, 2); ?> / ৳<?php echo number_format($limit, 2); ?>
+                Spent: ৳<?= number_format($spent, 2) ?> / ৳<?= number_format($limit, 2) ?>
             </p>
 
             <?php if ($limit > 0 && $spent > $limit): ?>
-                <div class="warning">⚠ You have exceeded your monthly budget by ৳<?php echo number_format(abs($remaining), 2); ?>.</div>
+                <div class="warning">⚠ You have exceeded your monthly budget by ৳<?= number_format(abs($remaining), 2) ?>.</div>
             <?php elseif ($limit > 0 && $pct >= 85): ?>
                 <div class="warning">⚠ You are close to your monthly budget limit.</div>
             <?php endif; ?>
         </section>
-    </div>
-</main>
+
+    </main>
+</div>
+
+<script>
+document.addEventListener('click', function(e) {
+    const sidebar   = document.querySelector('.sidebar');
+    const hamburger = document.querySelector('.hamburger');
+    if (window.innerWidth <= 768 && !sidebar.contains(e.target) && !hamburger.contains(e.target)) {
+        sidebar.classList.remove('open');
+    }
+});
+
+// ── Budget Alert Sounds ──────────────────────────────────────
+(function () {
+    const hasBudget = <?= $limit > 0 ? 'true' : 'false' ?>;
+    const budgetPct = <?= $limit > 0 ? json_encode(round($pct, 2)) : 0 ?>;
+    const exceeded  = <?= ($limit > 0 && $spent > $limit) ? 'true' : 'false' ?>;
+
+    let audioCtx = null;
+    let played   = false;
+
+    function getCtx() {
+        if (!audioCtx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) audioCtx = new AC();
+        }
+        return audioCtx;
+    }
+
+    // 🟡 Amber warning — soft single beep
+    function playWarningBeep() {
+        const ctx = getCtx();
+        if (!ctx) return;
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 520;
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.6);
+    }
+
+    // 🔴 Red alert — deep air horn
+    function playAlertBeep() {
+        const ctx = getCtx();
+        if (!ctx) return;
+
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(120, ctx.currentTime);
+        osc1.frequency.linearRampToValueAtTime(110, ctx.currentTime + 0.4);
+
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(124, ctx.currentTime);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 0.02);
+        gain.gain.setValueAtTime(0.4, ctx.currentTime + 0.30);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+
+        osc1.start(ctx.currentTime);
+        osc2.start(ctx.currentTime);
+        osc1.stop(ctx.currentTime + 0.45);
+        osc2.stop(ctx.currentTime + 0.45);
+    }
+
+    function doPlay() {
+        if (exceeded || budgetPct >= 85) {
+            playAlertBeep();
+        } else if (budgetPct >= 60) {
+            playWarningBeep();
+        }
+    }
+
+    function maybePlay() {
+        if (played || !hasBudget) return;
+        played = true;
+        const ctx = getCtx();
+        if (!ctx) return;
+        if (ctx.state === 'suspended') {
+            ctx.resume().then(function() { setTimeout(doPlay, 400); });
+        } else {
+            setTimeout(doPlay, 400);
+        }
+    }
+
+    // Try on load
+    maybePlay();
+
+    // Fallback — fire on first user interaction
+    ['click', 'keydown', 'touchstart'].forEach(function(evt) {
+        document.addEventListener(evt, maybePlay, { once: true });
+    });
+})();
+</script>
+
 </body>
 </html>

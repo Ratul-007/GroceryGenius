@@ -4,11 +4,18 @@ A smart grocery management and meal planning web application built for everyday 
 
 ## 🌟 Features
 
-- **Pantry Manager** — Track grocery items, quantities, and expiry dates with real-time expiry alerts
-- **Recipe Suggestions** — Get recipe ideas based on available pantry ingredients
-- **Shopping List** — Auto-generate and manage your shopping list
-- **Budget Tracker** — Monitor grocery spending and stay within budget
-- **Price Tracker** — Record and compare daily grocery prices with 7-day trend charts
+- **Dashboard** — Live overview of pantry status, expiry alerts, budget usage, and recipes cooked this month
+- **Pantry Manager** — Track grocery items, quantities, and expiry dates with automatic expired/expiring-soon alerts
+- **Recipe Suggestions** — Get recipe ideas ranked by available purchased ingredients with pantry match percentage
+- **Cook Mode** — Step-by-step cooking guide with serving size adjuster and automatic ingredient deduction on completion
+- **Cooking History** — Full log of every recipe cooked with date, time, and stats
+- **Recipe Favorites** — Bookmark favourite recipes for quick access
+- **Shopping List** — Add items, mark as purchased, and auto-deduct from monthly budget
+- **Budget Tracker** — Monitor grocery spending with colour-coded progress bar and audio alerts (amber warning + red air horn)
+- **Expense History** — Day-by-day breakdown of all grocery purchases with monthly filter
+- **Monthly Report** — Full monthly summary including daily spending chart, top products, category breakdown, and recipes cooked
+- **Price Tracker** — Record and compare daily grocery prices with 7-day trend charts and yesterday comparison
+- **Profile Page** — Update name, contact, profile photo, and change password
 
 ## 👥 Team — 404 Team Not Found
 
@@ -22,9 +29,9 @@ A smart grocery management and meal planning web application built for everyday 
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | HTML5, CSS3, JavaScript |
+| Frontend | HTML5, CSS3, JavaScript (Web Audio API) |
 | Backend | PHP 8 |
-| Database | MySQL |
+| Database | MySQL (MariaDB 10.4) |
 | Server | Apache (XAMPP) |
 
 ## ⚙️ Installation
@@ -43,8 +50,8 @@ A smart grocery management and meal planning web application built for everyday 
 3. **Import the database**
    - Start Apache and MySQL from XAMPP Control Panel
    - Open `http://localhost/phpmyadmin`
-   - Create a new database named `grocerygenius`
-   - Import `grocerygenius.sql`
+   - Create a new database named `grocerygenius_db`
+   - Import `sql/grocerygenius.sql`
 
 4. **Configure database connection**
    - Open `config/db.php`
@@ -58,26 +65,67 @@ A smart grocery management and meal planning web application built for everyday 
 ```
 GroceryGenius/
 ├── assets/
-│   └── css/            # Stylesheets
+│   ├── css/                # Global stylesheet (dark purple theme)
+│   └── uploads/avatars/    # User profile photos
 ├── config/
-│   └── db.php          # Database connection
-├── pages/              # All PHP pages
-│   ├── dashboard.php
-│   ├── pantry.php
-│   ├── recipes.php
-│   ├── shopping.php
-│   ├── budget.php
-│   └── prices.php
-├── sql/                # SQL scripts
-├── grocerygenius.sql   # Full database dump
-└── index.php           # Entry point
+│   └── db.php              # Database connection
+├── pages/                  # All PHP pages
+│   ├── dashboard.php       # Home overview
+│   ├── pantry.php          # Pantry management
+│   ├── recipes.php         # Recipe suggestions + favorites
+│   ├── cook.php            # Step-by-step cook mode
+│   ├── cooking_history.php # Cooking log
+│   ├── shopping.php        # Shopping list
+│   ├── budget.php          # Budget tracker
+│   ├── expense_history.php # Purchase history
+│   ├── monthly_report.php  # Monthly summary report
+│   ├── prices.php          # Price tracker
+│   ├── profile.php         # User profile
+│   ├── login.php           # Login
+│   ├── register.php        # Registration
+│   └── logout.php          # Logout
+├── sql/                    # SQL scripts
+└── index.php               # Entry point (redirects to login/dashboard)
 ```
+
+## 🔄 Core Loop
+
+```
+Add to Shopping List
+       ↓
+Mark as Purchased → Budget Auto-Deducted
+       ↓
+Recipe Match 100%
+       ↓
+Cook Mode (serving size adjustable)
+       ↓
+Finish Cooking → Ingredients Deducted
+       ↓
+Recipe resets to 0% → Loop continues 🔄
+```
+
+## 🗄️ Database Tables
+
+| Table | Purpose |
+|-------|---------|
+| `users` | User accounts |
+| `products` | Product catalogue |
+| `pantry_items` | User pantry stock |
+| `recipes` | Recipe definitions |
+| `recipe_ingredients` | Recipe ingredient mappings |
+| `recipe_favorites` | Bookmarked recipes per user |
+| `shopping_list` | Active shopping items |
+| `purchase_history` | Permanent purchase records |
+| `cooking_history` | Cooking session log |
+| `budget` | Monthly budget limits and spending |
+| `grocery_prices` | Current tracked prices |
+| `price_history` | Historical price records |
 
 ## 🔮 Future Scope
 
-- **Automated Price Updates** — Integration with TCB (Trading Corporation of Bangladesh) daily commodity price data to automatically update grocery prices without manual entry
-- **AI Recipe Recommendations** — Smarter recipe suggestions using machine learning based on pantry contents and user preferences
-- **Mobile App** — Native Android/iOS version for on-the-go pantry and shopping list management
+- **Automated Price Updates** — Integration with TCB (Trading Corporation of Bangladesh) daily commodity price data
+- **AI Recipe Recommendations** — Smarter suggestions using machine learning based on pantry contents and preferences
+- **Mobile App** — Native Android/iOS version for on-the-go management
 - **Multi-user Household** — Share pantry and shopping lists across family members
 - **Barcode Scanner** — Scan product barcodes to add items to pantry instantly
 - **Price Alert System** — Get notified when a tracked product price rises above a threshold

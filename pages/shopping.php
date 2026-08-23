@@ -403,11 +403,24 @@ foreach ($purchased_items as $item) {
             <a href="pantry.php" class="nav-item"><span class="nav-icon">🥦</span> Pantry</a>
             <a href="recipes.php" class="nav-item"><span class="nav-icon">🍳</span> Recipes</a>
             <a href="shopping.php" class="nav-item active"><span class="nav-icon">🛍️</span> Shopping List</a>
-            <div class="nav-label">Finance</div>
+            <a href="cooking_history.php" class="nav-item">
+    <span class="nav-icon">📖</span> Cooking History
+</a>
+
+<div class="nav-label">Finance</div>
             <a href="budget.php" class="nav-item"><span class="nav-icon">💰</span> Budget</a>
-            <a href="prices.php" class="nav-item"><span class="nav-icon">📊</span> Price Tracker</a>
+            <a href="expense_history.php" class="nav-item">
+    <span class="nav-icon">🧾</span> Expense History
+</a>
+<a href="monthly_report.php" class="nav-item">
+    <span class="nav-icon">📊</span> Monthly Report
+</a>
+<a href="prices.php" class="nav-item"><span class="nav-icon">📊</span> Price Tracker</a>
             <div class="nav-label">Account</div>
-            <a href="logout.php" class="nav-item"><span class="nav-icon">🚪</span> Logout</a>
+            <a href="profile.php" class="nav-item">
+    <span class="nav-icon">👤</span> Profile
+</a>
+<a href="logout.php" class="nav-item"><span class="nav-icon">🚪</span> Logout</a>
         </nav>
         <div class="sidebar-footer"><div class="user-info"><div class="user-avatar"><?= htmlspecialchars($avatar_letter) ?></div><div><div class="user-name"><?= htmlspecialchars($user_name) ?></div><div class="user-role">Member</div></div></div></div>
     </aside>

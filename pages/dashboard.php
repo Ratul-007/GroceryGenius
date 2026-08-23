@@ -2,7 +2,6 @@
 session_start();
 require_once '../config/db.php';
 
-// Session guard
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
@@ -13,23 +12,26 @@ $user_name = $_SESSION['user_name'];
 
 // ── STAT QUERIES ──
 
-// Total pantry items
 $q1 = $pdo->prepare("SELECT COUNT(*) FROM pantry_items WHERE user_id = ?");
 $q1->execute([$user_id]);
 $total_pantry = $q1->fetchColumn();
 
-// Expiring within 3 days
+// Expiring within 7 days (not yet expired)
 $q2 = $pdo->prepare("SELECT COUNT(*) FROM pantry_items
-    WHERE user_id = ? AND expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY)");
+    WHERE user_id = ? AND expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)");
 $q2->execute([$user_id]);
 $expiring_soon = $q2->fetchColumn();
 
-// Shopping list pending items
+// Expired items count
+$q_expired = $pdo->prepare("SELECT COUNT(*) FROM pantry_items
+    WHERE user_id = ? AND expiry_date < CURDATE()");
+$q_expired->execute([$user_id]);
+$expired_count = $q_expired->fetchColumn();
+
 $q3 = $pdo->prepare("SELECT COUNT(*) FROM shopping_list WHERE user_id = ? AND is_purchased = 0");
 $q3->execute([$user_id]);
 $shopping_pending = $q3->fetchColumn();
 
-// Budget this month
 $month = date('Y-m');
 $q4 = $pdo->prepare("SELECT limit_amount, spent_amount FROM budget WHERE user_id = ? AND month = ?");
 $q4->execute([$user_id, $month]);
@@ -39,7 +41,11 @@ if ($budget && $budget['limit_amount'] > 0) {
     $budget_pct = round(($budget['spent_amount'] / $budget['limit_amount']) * 100);
 }
 
-// Recent pantry items (last 5)
+$q7 = $pdo->prepare("SELECT COUNT(*) FROM cooking_history WHERE user_id = ? AND DATE_FORMAT(cooked_at, '%Y-%m') = ?");
+$q7->execute([$user_id, $month]);
+$cooked_this_month = $q7->fetchColumn();
+
+// Recent pantry items
 $q5 = $pdo->prepare("SELECT pi.*, p.name as product_name, p.category
     FROM pantry_items pi
     JOIN products p ON pi.product_id = p.product_id
@@ -48,17 +54,26 @@ $q5 = $pdo->prepare("SELECT pi.*, p.name as product_name, p.category
 $q5->execute([$user_id]);
 $recent_items = $q5->fetchAll();
 
-// Expiring items alert (within 3 days)
+// Expiring within 7 days (not yet expired)
 $q6 = $pdo->prepare("SELECT pi.*, p.name as product_name,
     DATEDIFF(pi.expiry_date, CURDATE()) as days_left
     FROM pantry_items pi
     JOIN products p ON pi.product_id = p.product_id
-    WHERE pi.user_id = ? AND pi.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 3 DAY)
+    WHERE pi.user_id = ? AND expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
     ORDER BY pi.expiry_date ASC LIMIT 5");
 $q6->execute([$user_id]);
 $expiring_items = $q6->fetchAll();
 
-// First letter of name for avatar
+// Expired items list
+$q_expired_list = $pdo->prepare("SELECT pi.*, p.name as product_name,
+    DATEDIFF(pi.expiry_date, CURDATE()) as days_left
+    FROM pantry_items pi
+    JOIN products p ON pi.product_id = p.product_id
+    WHERE pi.user_id = ? AND expiry_date < CURDATE()
+    ORDER BY pi.expiry_date DESC LIMIT 5");
+$q_expired_list->execute([$user_id]);
+$expired_items = $q_expired_list->fetchAll();
+
 $avatar_letter = strtoupper(substr($user_name, 0, 1));
 ?>
 <!DOCTYPE html>
@@ -83,6 +98,13 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
     .welcome-badge {
       background: rgba(255,255,255,0.1); padding: 6px 14px;
       border-radius: 20px; font-size: 0.8rem; color: #fff; font-weight: 600;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
     }
 
     .section-title {
@@ -123,20 +145,19 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
     .item-meta { font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; }
 
     @media (max-width: 768px) {
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
       .two-panel { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 
-<!-- Mobile hamburger -->
 <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">
   <span></span><span></span><span></span>
 </button>
 
 <div class="app-layout">
 
-  <!-- ══ SIDEBAR ══ -->
   <aside class="sidebar">
     <div class="sidebar-logo">
       <div class="logo-text">🛒 GroceryGenius</div>
@@ -157,17 +178,29 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
       <a href="shopping.php" class="nav-item">
         <span class="nav-icon">🛍️</span> Shopping List
       </a>
+      <a href="cooking_history.php" class="nav-item">
+        <span class="nav-icon">📖</span> Cooking History
+      </a>
 
       <div class="nav-label">Finance</div>
       <a href="budget.php" class="nav-item">
         <span class="nav-icon">💰</span> Budget
       </a>
-      <a href="prices.php" class="nav-item">
+      <a href="expense_history.php" class="nav-item">
+        <span class="nav-icon">🧾</span> Expense History
+      </a>
+      <a href="monthly_report.php" class="nav-item">
+    <span class="nav-icon">📊</span> Monthly Report
+</a>
+<a href="prices.php" class="nav-item">
         <span class="nav-icon">📊</span> Price Tracker
       </a>
 
       <div class="nav-label">Account</div>
-      <a href="logout.php" class="nav-item">
+      <a href="profile.php" class="nav-item">
+    <span class="nav-icon">👤</span> Profile
+</a>
+<a href="logout.php" class="nav-item">
         <span class="nav-icon">🚪</span> Logout
       </a>
     </nav>
@@ -183,10 +216,8 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
     </div>
   </aside>
 
-  <!-- ══ MAIN CONTENT ══ -->
   <main class="main-content">
 
-    <!-- Welcome Banner -->
     <div class="welcome-banner">
       <div>
         <h2>Good <?= (date('H') < 12) ? 'morning' : ((date('H') < 18) ? 'afternoon' : 'evening') ?>, <?= htmlspecialchars($user_name) ?> 👋</h2>
@@ -197,6 +228,7 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
 
     <!-- STAT CARDS -->
     <div class="stat-grid">
+
       <div class="stat-card">
         <div class="stat-icon purple">🥦</div>
         <div>
@@ -204,6 +236,7 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
           <div class="stat-label">Pantry Items</div>
         </div>
       </div>
+
       <div class="stat-card">
         <div class="stat-icon red">⚠️</div>
         <div>
@@ -211,6 +244,7 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
           <div class="stat-label">Expiring Soon</div>
         </div>
       </div>
+
       <div class="stat-card">
         <div class="stat-icon orange">🛍️</div>
         <div>
@@ -218,6 +252,7 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
           <div class="stat-label">Shopping Pending</div>
         </div>
       </div>
+
       <div class="stat-card">
         <div class="stat-icon green">💰</div>
         <div>
@@ -225,6 +260,15 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
           <div class="stat-label">Budget Used</div>
         </div>
       </div>
+
+      <div class="stat-card">
+        <div class="stat-icon purple">🍳</div>
+        <div>
+          <div class="stat-val"><?= $cooked_this_month ?></div>
+          <div class="stat-label">Recipes Cooked</div>
+        </div>
+      </div>
+
     </div>
 
     <!-- QUICK ACTIONS -->
@@ -233,12 +277,13 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
       <a href="recipes.php" class="quick-btn">🍳 Get Recipes</a>
       <a href="shopping.php" class="quick-btn">🛍️ Shopping List</a>
       <a href="prices.php" class="quick-btn">📊 Check Prices</a>
+      <a href="expense_history.php" class="quick-btn">🧾 Expense History</a>
     </div>
 
-    <!-- TWO PANEL: Recent Items + Expiring Alerts -->
+    <!-- TWO PANEL -->
     <div class="two-panel">
 
-      <!-- Recent Pantry Items -->
+      <!-- LEFT: Recent Pantry Items -->
       <div class="card">
         <div class="section-title">Recent Pantry Items</div>
         <?php if (empty($recent_items)): ?>
@@ -259,16 +304,37 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
         <?php endif; ?>
       </div>
 
-      <!-- Expiring Soon + Budget -->
+      <!-- RIGHT: Expired + Expiring Soon + Budget -->
       <div style="display:flex;flex-direction:column;gap:20px">
 
-        <!-- Expiring Alerts -->
+        <!-- EXPIRED BOX -->
+        <div class="card">
+          <div class="section-title">❌ Expired</div>
+          <?php if (empty($expired_items)): ?>
+            <div class="empty-state">
+              <div class="empty-icon">✅</div>
+              <p>No expired items!</p>
+            </div>
+          <?php else: ?>
+            <?php foreach ($expired_items as $item): ?>
+              <div class="item-row">
+                <div>
+                  <div class="item-name"><?= htmlspecialchars($item['product_name']) ?></div>
+                  <div class="item-meta">Expired: <?= $item['expiry_date'] ?></div>
+                </div>
+                <span class="badge badge-danger">Expired</span>
+              </div>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </div>
+
+        <!-- EXPIRING SOON BOX -->
         <div class="card">
           <div class="section-title">⚠️ Expiring Soon</div>
           <?php if (empty($expiring_items)): ?>
             <div class="empty-state">
               <div class="empty-icon">✅</div>
-              <p>No items expiring soon!</p>
+              <p>No items expiring within 7 days!</p>
             </div>
           <?php else: ?>
             <?php foreach ($expiring_items as $item): ?>
@@ -278,9 +344,9 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
                   <div class="item-meta">Expires: <?= $item['expiry_date'] ?></div>
                 </div>
                 <?php
-                  $d = $item['days_left'];
-                  $cls = $d <= 0 ? 'badge-danger' : ($d <= 1 ? 'badge-danger' : 'badge-warning');
-                  $label = $d <= 0 ? 'Expired!' : ($d == 1 ? '1 day left' : "$d days left");
+                  $d = (int)$item['days_left'];
+                  $cls   = $d <= 1 ? 'badge-danger' : 'badge-warning';
+                  $label = $d == 0 ? 'Today!' : ($d == 1 ? '1 day left' : "$d days left");
                 ?>
                 <span class="badge <?= $cls ?>"><?= $label ?></span>
               </div>
@@ -288,7 +354,7 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
           <?php endif; ?>
         </div>
 
-        <!-- Budget Card -->
+        <!-- BUDGET -->
         <div class="card">
           <div class="section-title">💰 Budget — <?= date('F Y') ?></div>
           <?php if (!$budget): ?>
@@ -320,7 +386,6 @@ $avatar_letter = strtoupper(substr($user_name, 0, 1));
 </div>
 
 <script>
-// Close sidebar on outside click (mobile)
 document.addEventListener('click', function(e) {
   const sidebar = document.querySelector('.sidebar');
   const hamburger = document.querySelector('.hamburger');
