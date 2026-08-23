@@ -244,3 +244,26 @@ select.form-control { cursor: pointer; }
 .hamburger span {
   display: block; width: 20px; height: 2px; background: #fff; border-radius: 2px;
 }
+/* ── Custom Scrollbar ── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0d0718;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #3b1b68;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #6d28d9;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #3b1b68 #0d0718;
+}
