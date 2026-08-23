@@ -249,15 +249,28 @@ $units = ['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'dozen', 'bottle', 'box'];
       <a href="shopping.php" class="nav-item">
         <span class="nav-icon">🛍️</span> Shopping List
       </a>
-      <div class="nav-label">Finance</div>
+      <a href="cooking_history.php" class="nav-item">
+    <span class="nav-icon">📖</span> Cooking History
+</a>
+
+<div class="nav-label">Finance</div>
       <a href="budget.php" class="nav-item">
         <span class="nav-icon">💰</span> Budget
       </a>
-      <a href="prices.php" class="nav-item">
+      <a href="expense_history.php" class="nav-item">
+    <span class="nav-icon">🧾</span> Expense History
+</a>
+<a href="monthly_report.php" class="nav-item">
+    <span class="nav-icon">📊</span> Monthly Report
+</a>
+<a href="prices.php" class="nav-item">
         <span class="nav-icon">📊</span> Price Tracker
       </a>
       <div class="nav-label">Account</div>
-      <a href="logout.php" class="nav-item">
+      <a href="profile.php" class="nav-item">
+    <span class="nav-icon">👤</span> Profile
+</a>
+<a href="logout.php" class="nav-item">
         <span class="nav-icon">🚪</span> Logout
       </a>
     </nav>
