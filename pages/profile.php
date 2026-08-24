@@ -9,13 +9,17 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id       = (int)$_SESSION['user_id'];
 $success       = '';
+if (isset($_GET['msg']) && $_GET['msg'] === 'password_changed') {
+    $success = 'Password changed successfully!';
+}
 $error         = '';
 
+
 // ============================================================
-// FETCH CURRENT USER
+// FETCH CURRENT USER (include password for verification)
 // ============================================================
 
-$stmt = $pdo->prepare("SELECT user_id, name, email, phone, profile_photo, created_at FROM users WHERE user_id = ?");
+$stmt = $pdo->prepare("SELECT user_id, name, email, phone, profile_photo, password, created_at FROM users WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -36,10 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     } else {
         $file     = $_FILES['profile_photo'];
         $allowed  = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-        $max_size = 2 * 1024 * 1024; // 2MB
+        $max_size = 2 * 1024 * 1024;
 
-        $finfo    = finfo_open(FILEINFO_MIME_TYPE);
-        $mime     = finfo_file($finfo, $file['tmp_name']);
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $file['tmp_name']);
         finfo_close($finfo);
 
         if (!in_array($mime, $allowed)) {
@@ -48,21 +52,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $error = 'Image must be under 2MB.';
         } else {
             $upload_dir = '../assets/uploads/avatars/';
-            if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0755, true);
-            }
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
 
             $ext      = pathinfo($file['name'], PATHINFO_EXTENSION);
             $filename = 'avatar_' . $user_id . '_' . time() . '.' . strtolower($ext);
             $dest     = $upload_dir . $filename;
 
             if (move_uploaded_file($file['tmp_name'], $dest)) {
-                // Delete old photo if exists
                 if (!empty($user['profile_photo'])) {
                     $old = '../assets/uploads/avatars/' . $user['profile_photo'];
                     if (file_exists($old)) unlink($old);
                 }
-
                 $pdo->prepare("UPDATE users SET profile_photo = ? WHERE user_id = ?")->execute([$filename, $user_id]);
                 $user['profile_photo'] = $filename;
                 $success = 'Profile photo updated successfully!';
@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 
 // ============================================================
-// HANDLE PROFILE INFO UPDATE (name, email, phone)
+// HANDLE PROFILE INFO UPDATE
 // ============================================================
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_info') {
@@ -89,7 +89,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
     } else {
-        // Check email uniqueness
         $check = $pdo->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?");
         $check->execute([$email, $user_id]);
         if ($check->fetch()) {
@@ -97,7 +96,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         } else {
             $pdo->prepare("UPDATE users SET name = ?, email = ?, phone = ? WHERE user_id = ?")
                 ->execute([$name, $email, $phone ?: null, $user_id]);
-
             $_SESSION['user_name'] = $name;
             $user['name']  = $name;
             $user['email'] = $email;
@@ -114,9 +112,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'change_password') {
 
-    $current  = $_POST['current_password'] ?? '';
-    $new      = $_POST['new_password'] ?? '';
-    $confirm  = $_POST['confirm_password'] ?? '';
+    $current = $_POST['current_password'] ?? '';
+    $new     = $_POST['new_password'] ?? '';
+    $confirm = $_POST['confirm_password'] ?? '';
 
     if (empty($current) || empty($new) || empty($confirm)) {
         $error = 'All password fields are required.';
@@ -129,7 +127,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     } else {
         $hashed = password_hash($new, PASSWORD_DEFAULT);
         $pdo->prepare("UPDATE users SET password = ? WHERE user_id = ?")->execute([$hashed, $user_id]);
-        $success = 'Password changed successfully!';
+        header('Location: profile.php?msg=password_changed');
+exit;
     }
 }
 
@@ -211,24 +210,9 @@ $photo_url     = !empty($user['profile_photo'])
 
         .avatar-edit-btn:hover { background: var(--purple-400); }
 
-        .profile-name {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--text-main);
-            margin-bottom: 4px;
-        }
-
-        .profile-email {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-
-        .profile-joined {
-            font-size: 0.75rem;
-            color: var(--text-soft);
-            margin-bottom: 20px;
-        }
+        .profile-name    { font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+        .profile-email   { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+        .profile-joined  { font-size: 0.75rem; color: var(--text-soft); margin-bottom: 20px; }
 
         .photo-upload-form { margin-top: 8px; }
 
@@ -320,6 +304,7 @@ $photo_url     = !empty($user['profile_photo'])
             font-size: 0.88rem;
             font-family: 'Inter', sans-serif;
             transition: border-color 0.2s;
+            box-sizing: border-box;
         }
 
         .form-group input:focus {
@@ -340,32 +325,42 @@ $photo_url     = !empty($user['profile_photo'])
             transition: all 0.2s;
         }
 
-        .save-btn:hover {
-            background: var(--purple-500);
-            transform: translateY(-1px);
-        }
+        .save-btn:hover { background: var(--purple-500); transform: translateY(-1px); }
 
+        /* ── PASSWORD TOGGLE ── */
+        .pass-wrap { position: relative; }
+        .pass-wrap input { padding-right: 42px !important; }
+        .pass-toggle {
+            position: absolute;
+            right: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 1rem;
+            padding: 0;
+            line-height: 1;
+        }
+        .pass-toggle:hover { color: var(--purple-300); }
+
+        /* ── PASSWORD STRENGTH ── */
         .password-strength {
             height: 4px;
             border-radius: 2px;
             margin-top: 6px;
-            transition: all 0.3s;
             background: var(--border);
+            transition: all 0.3s;
         }
-
         .strength-weak   { background: #ef4444; width: 33%; }
         .strength-medium { background: #f59e0b; width: 66%; }
         .strength-strong { background: #10b981; width: 100%; }
-
-        .strength-label {
-            font-size: 0.7rem;
-            margin-top: 4px;
-            color: var(--text-soft);
-        }
+        .strength-label  { font-size: 0.7rem; margin-top: 4px; color: var(--text-soft); }
 
         @media (max-width: 768px) {
-            .profile-layout  { grid-template-columns: 1fr; }
-            .form-row-2 { grid-template-columns: 1fr; }
+            .profile-layout { grid-template-columns: 1fr; }
+            .form-row-2     { grid-template-columns: 1fr; }
         }
 
     </style>
@@ -385,7 +380,6 @@ $photo_url     = !empty($user['profile_photo'])
             <div class="logo-text">🛒 GroceryGenius</div>
             <div class="logo-sub">Smart grocery management</div>
         </div>
-
         <nav class="sidebar-nav">
             <div class="nav-label">Main</div>
             <a href="dashboard.php" class="nav-item"><span class="nav-icon">🏠</span> Dashboard</a>
@@ -397,18 +391,13 @@ $photo_url     = !empty($user['profile_photo'])
             <div class="nav-label">Finance</div>
             <a href="budget.php" class="nav-item"><span class="nav-icon">💰</span> Budget</a>
             <a href="expense_history.php" class="nav-item"><span class="nav-icon">🧾</span> Expense History</a>
-            <a href="monthly_report.php" class="nav-item">
-    <span class="nav-icon">📊</span> Monthly Report
-</a>
-<a href="prices.php" class="nav-item"><span class="nav-icon">📊</span> Price Tracker</a>
+            <a href="monthly_report.php" class="nav-item"><span class="nav-icon">📊</span> Monthly Report</a>
+            <a href="prices.php" class="nav-item"><span class="nav-icon">📈</span> Price Tracker</a>
 
             <div class="nav-label">Account</div>
             <a href="profile.php" class="nav-item active"><span class="nav-icon">👤</span> Profile</a>
-
-</a>
-<a href="logout.php" class="nav-item"><span class="nav-icon">🚪</span> Logout</a>
+            <a href="logout.php" class="nav-item"><span class="nav-icon">🚪</span> Logout</a>
         </nav>
-
         <div class="sidebar-footer">
             <div class="user-info">
                 <?php if ($photo_url): ?>
@@ -476,10 +465,10 @@ $photo_url     = !empty($user['profile_photo'])
             </div>
 
 
-            <!-- RIGHT: INFO + PASSWORD -->
+            <!-- RIGHT -->
             <div class="right-side">
 
-                <!-- PROFILE INFO -->
+                <!-- PERSONAL INFO -->
                 <div class="section-card">
                     <h3>📝 Personal Information</h3>
                     <form method="POST">
@@ -508,22 +497,34 @@ $photo_url     = !empty($user['profile_photo'])
                     <h3>🔒 Change Password</h3>
                     <form method="POST">
                         <input type="hidden" name="action" value="change_password"/>
+
                         <div class="form-group">
                             <label>Current Password</label>
-                            <input type="password" name="current_password" placeholder="Enter current password"/>
+                            <div class="pass-wrap">
+                                <input type="password" name="current_password" id="currentPass" placeholder="Enter current password"/>
+                                <button type="button" class="pass-toggle" onclick="togglePass('currentPass', this)">👁️</button>
+                            </div>
                         </div>
+
                         <div class="form-row-2">
                             <div class="form-group">
                                 <label>New Password</label>
-                                <input type="password" name="new_password" id="newPassword" placeholder="Min 6 characters" oninput="checkStrength(this.value)"/>
+                                <div class="pass-wrap">
+                                    <input type="password" name="new_password" id="newPass" placeholder="Min 6 characters" oninput="checkStrength(this.value)"/>
+                                    <button type="button" class="pass-toggle" onclick="togglePass('newPass', this)">👁️</button>
+                                </div>
                                 <div class="password-strength" id="strengthBar"></div>
                                 <div class="strength-label" id="strengthLabel"></div>
                             </div>
                             <div class="form-group">
                                 <label>Confirm New Password</label>
-                                <input type="password" name="confirm_password" placeholder="Repeat new password"/>
+                                <div class="pass-wrap">
+                                    <input type="password" name="confirm_password" id="confirmPass" placeholder="Repeat new password"/>
+                                    <button type="button" class="pass-toggle" onclick="togglePass('confirmPass', this)">👁️</button>
+                                </div>
                             </div>
                         </div>
+
                         <button type="submit" class="save-btn">🔑 Change Password</button>
                     </form>
                 </div>
@@ -556,33 +557,19 @@ $photo_url     = !empty($user['profile_photo'])
 
 <script>
 
-// Photo preview
-function previewPhoto(input) {
-    const file = input.files[0];
-    if (!file) return;
-
-    document.getElementById('photo_preview_name').textContent = file.name;
-    document.getElementById('uploadBtn').style.display = 'block';
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const existing = document.getElementById('avatarPreview');
-        const placeholder = document.getElementById('avatarPlaceholder');
-
-        if (existing) {
-            existing.src = e.target.result;
-        } else if (placeholder) {
-            const img = document.createElement('img');
-            img.src = e.target.result;
-            img.className = 'avatar-img';
-            img.id = 'avatarPreview';
-            placeholder.replaceWith(img);
-        }
-    };
-    reader.readAsDataURL(file);
+// ── Show/Hide Password ───────────────────────────────────────
+function togglePass(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+        input.type  = 'text';
+        btn.textContent = '🙈';
+    } else {
+        input.type  = 'password';
+        btn.textContent = '👁️';
+    }
 }
 
-// Password strength checker
+// ── Password Strength ────────────────────────────────────────
 function checkStrength(val) {
     const bar   = document.getElementById('strengthBar');
     const label = document.getElementById('strengthLabel');
@@ -613,7 +600,33 @@ function checkStrength(val) {
     }
 }
 
-// Mobile sidebar
+// ── Photo Preview ────────────────────────────────────────────
+function previewPhoto(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    document.getElementById('photo_preview_name').textContent = file.name;
+    document.getElementById('uploadBtn').style.display = 'block';
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const existing    = document.getElementById('avatarPreview');
+        const placeholder = document.getElementById('avatarPlaceholder');
+
+        if (existing) {
+            existing.src = e.target.result;
+        } else if (placeholder) {
+            const img = document.createElement('img');
+            img.src       = e.target.result;
+            img.className = 'avatar-img';
+            img.id        = 'avatarPreview';
+            placeholder.replaceWith(img);
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+// ── Mobile sidebar ───────────────────────────────────────────
 document.addEventListener('click', function(e) {
     const sidebar   = document.querySelector('.sidebar');
     const hamburger = document.querySelector('.hamburger');

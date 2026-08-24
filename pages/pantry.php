@@ -171,6 +171,7 @@ $units = ['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'dozen', 'bottle', 'box'];
       background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius); overflow: hidden;
     }
+    .table-scroll { overflow-x: auto; }
     .table-header-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 16px 20px; border-bottom: 1px solid var(--border);
@@ -250,27 +251,26 @@ $units = ['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'dozen', 'bottle', 'box'];
         <span class="nav-icon">🛍️</span> Shopping List
       </a>
       <a href="cooking_history.php" class="nav-item">
-    <span class="nav-icon">📖</span> Cooking History
-</a>
-
-<div class="nav-label">Finance</div>
+        <span class="nav-icon">📖</span> Cooking History
+      </a>
+      <div class="nav-label">Finance</div>
       <a href="budget.php" class="nav-item">
         <span class="nav-icon">💰</span> Budget
       </a>
       <a href="expense_history.php" class="nav-item">
-    <span class="nav-icon">🧾</span> Expense History
-</a>
-<a href="monthly_report.php" class="nav-item">
-    <span class="nav-icon">📊</span> Monthly Report
-</a>
-<a href="prices.php" class="nav-item">
-        <span class="nav-icon">📊</span> Price Tracker
+        <span class="nav-icon">🧾</span> Expense History
+      </a>
+      <a href="monthly_report.php" class="nav-item">
+        <span class="nav-icon">📊</span> Monthly Report
+      </a>
+      <a href="prices.php" class="nav-item">
+        <span class="nav-icon">📈</span> Price Tracker
       </a>
       <div class="nav-label">Account</div>
       <a href="profile.php" class="nav-item">
-    <span class="nav-icon">👤</span> Profile
-</a>
-<a href="logout.php" class="nav-item">
+        <span class="nav-icon">👤</span> Profile
+      </a>
+      <a href="logout.php" class="nav-item">
         <span class="nav-icon">🚪</span> Logout
       </a>
     </nav>
@@ -405,6 +405,7 @@ $units = ['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'dozen', 'bottle', 'box'];
           <?php endif; ?>
         </div>
       <?php else: ?>
+        <div class="table-scroll">
         <table class="table">
           <thead>
             <tr>
@@ -458,6 +459,7 @@ $units = ['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'dozen', 'bottle', 'box'];
             <?php endforeach; ?>
           </tbody>
         </table>
+        </div>
       <?php endif; ?>
     </div>
 

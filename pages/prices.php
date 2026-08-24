@@ -10,6 +10,7 @@ if (!isset($_SESSION['user_id'])) {
 $user_id       = (int) $_SESSION['user_id'];
 $user_name     = $_SESSION['user_name'] ?? 'User';
 $avatar_letter = strtoupper(substr($user_name, 0, 1));
+$is_admin      = !empty($_SESSION['is_admin']);
 
 $message = '';
 $error = '';
@@ -17,7 +18,10 @@ $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $category = isset($_GET['category']) ? trim($_GET['category']) : '';
 
 // Save today's price. Historical records are append-only when the price changes.
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_price'])) {
+// Admin-only action — also enforced here server-side, not just hidden in the UI.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_price']) && !$is_admin) {
+    $error = 'Only the admin can update prices.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_price']) && $is_admin) {
     $product_id = isset($_POST['product_id']) ? (int) $_POST['product_id'] : 0;
     $price_bdt = isset($_POST['price_bdt']) ? trim($_POST['price_bdt']) : '';
     $today = date('Y-m-d');
@@ -127,7 +131,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_price'])) {
 }
 
 // Delete only the current price. Historical price records are preserved permanently.
-if (isset($_GET['delete'])) {
+// Admin-only action.
+if (isset($_GET['delete']) && !$is_admin) {
+    header('Location: prices.php?status=forbidden');
+    exit();
+}
+if (isset($_GET['delete']) && $is_admin) {
     $price_id = (int) $_GET['delete'];
 
     try {
@@ -149,6 +158,9 @@ if (isset($_GET['delete'])) {
 
 if (isset($_GET['status']) && $_GET['status'] === 'deleted') {
     $message = 'Current price removed successfully. Price history was preserved.';
+}
+if (isset($_GET['status']) && $_GET['status'] === 'forbidden') {
+    $error = 'Only the admin can delete prices.';
 }
 
 $products = $pdo->query(
@@ -314,6 +326,7 @@ $history_stmt = $pdo->prepare(
         <?php if ($message): ?><div class="alert alert-success">✅ <?= htmlspecialchars($message) ?></div><?php endif; ?>
         <?php if ($error): ?><div class="alert alert-danger">⚠️ <?= htmlspecialchars($error) ?></div><?php endif; ?>
 
+        <?php if ($is_admin): ?>
         <section class="card">
             <h2>Add / Update Today's Price</h2>
             <form method="POST">
@@ -338,6 +351,11 @@ $history_stmt = $pdo->prepare(
                 </div>
             </form>
         </section>
+        <?php else: ?>
+        <div class="alert" style="background:rgba(124,58,237,0.1);border:1px solid var(--border);color:var(--text-muted);">
+            ℹ️ Prices shown here are maintained by the admin. You can browse current prices and trends below.
+        </div>
+        <?php endif; ?>
 
         <section class="card">
             <h2>Find Prices</h2>
@@ -375,7 +393,7 @@ $history_stmt = $pdo->prepare(
                         <tr>
                             <th>Product</th><th>Category</th><th>Today's Price</th>
                             <th>Previous Price</th><th>Change</th><th>Unit</th>
-                            <th>Last Updated</th><th>Action</th>
+                            <th>Last Updated</th><?php if ($is_admin): ?><th>Action</th><?php endif; ?>
                         </tr>
                         </thead>
                         <tbody>
@@ -403,12 +421,14 @@ $history_stmt = $pdo->prepare(
                             </td>
                             <td class="meta"><?= htmlspecialchars($item['unit'] ?: '—') ?></td>
                             <td class="meta"><?= htmlspecialchars(date('d M Y, h:i A', strtotime($item['updated_at']))) ?></td>
+                            <?php if ($is_admin): ?>
                             <td>
                                 <div class="actions">
                                     <a class="btn btn-danger btn-sm" href="prices.php?delete=<?= (int)$item['price_id'] ?>"
                                        onclick="return confirm('Delete this current price? Historical price data will be preserved.');">Delete</a>
                                 </div>
                             </td>
+                            <?php endif; ?>
                         </tr>
                         <?php endforeach; ?>
                         </tbody>
