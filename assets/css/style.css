@@ -192,7 +192,7 @@ select.form-control { cursor: pointer; }
 
 /* MAIN CONTENT */
 .main-content {
-  margin-left: var(--sidebar-w); flex: 1; padding: 28px 32px;
+  margin-left: var(--sidebar-w); flex: 1; min-width: 0; padding: 28px 32px;
   min-height: 100vh;
 }
 .page-header { margin-bottom: 24px; }
@@ -208,6 +208,7 @@ select.form-control { cursor: pointer; }
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 20px;
   display: flex; align-items: center; gap: 16px;
+  min-width: 0;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
@@ -220,7 +221,10 @@ select.form-control { cursor: pointer; }
 .stat-icon.green  { background: rgba(16,185,129,0.2); }
 .stat-icon.orange { background: rgba(245,158,11,0.2); }
 .stat-icon.red    { background: rgba(239,68,68,0.2);  }
-.stat-val  { font-size: 1.8rem; font-weight: 800; color: var(--text-main); line-height: 1; }
+.stat-val  {
+  font-size: 1.8rem; font-weight: 800; color: var(--text-main); line-height: 1.15;
+  overflow-wrap: anywhere; word-break: break-word; min-width: 0;
+}
 .stat-label{ font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; }
 
 /* PROGRESS BAR */
@@ -243,27 +247,4 @@ select.form-control { cursor: pointer; }
 }
 .hamburger span {
   display: block; width: 20px; height: 2px; background: #fff; border-radius: 2px;
-}
-/* ── Custom Scrollbar ── */
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: #0d0718;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #3b1b68;
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #6d28d9;
-}
-
-* {
-    scrollbar-width: thin;
-    scrollbar-color: #3b1b68 #0d0718;
 }
