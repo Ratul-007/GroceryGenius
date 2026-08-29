@@ -369,14 +369,28 @@ document.addEventListener('click', function(e) {
         }
     }
 
+    // IMPORTANT: only mark `played = true` once the AudioContext is actually
+    // running. On Safari/Firefox, ctx.resume() on page load (no user gesture)
+    // will silently fail to bring the context out of "suspended" state.
+    // If we mark `played = true` too early, the click/keydown/touchstart
+    // fallback listeners below never get a chance to fire, and the sound
+    // never plays on those browsers. Chrome/Edge often resume() successfully
+    // even without a gesture, which is why they "just worked" before.
     function maybePlay() {
         if (played || !hasBudget) return;
-        played = true;
         const ctx = getCtx();
         if (!ctx) return;
+
         if (ctx.state === 'suspended') {
-            ctx.resume().then(function() { setTimeout(doPlay, 400); });
+            ctx.resume().then(function () {
+                played = true;
+                setTimeout(doPlay, 400);
+            }).catch(function () {
+                // resume() failed — leave `played` false so a later user
+                // gesture (click/keydown/touchstart) can still trigger it.
+            });
         } else {
+            played = true;
             setTimeout(doPlay, 400);
         }
     }
@@ -384,8 +398,9 @@ document.addEventListener('click', function(e) {
     // Try on load
     maybePlay();
 
-    // Fallback — fire on first user interaction
-    ['click', 'keydown', 'touchstart'].forEach(function(evt) {
+    // Fallback — fire on first user interaction (this is what actually
+    // unlocks audio on Safari/Firefox/iOS)
+    ['click', 'keydown', 'touchstart'].forEach(function (evt) {
         document.addEventListener(evt, maybePlay, { once: true });
     });
 })();

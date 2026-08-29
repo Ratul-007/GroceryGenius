@@ -252,14 +252,27 @@ $history_stmt = $pdo->prepare(
         }
 
         .trend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
-        .trend-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+        .trend-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; min-width: 0; overflow: hidden; }
         .trend-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
         .trend-title { margin: 0; font-size: 1rem; color: var(--text-main); }
         .trend-current { color: var(--success); font-size: 1rem; font-weight: 700; white-space: nowrap; }
         .trend-subtitle { margin: 4px 0 0; color: var(--text-muted); font-size: 0.75rem; }
-        .trend-chart { height: 150px; display: flex; align-items: flex-end; gap: 9px; padding: 12px 4px 0; border-bottom: 1px solid var(--border); }
-        .trend-point { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-width: 0; }
-        .trend-value { color: var(--text-main); font-size: 0.68rem; margin-bottom: 6px; white-space: nowrap; }
+
+        /* Allow the chart to scroll horizontally within its own card on
+           narrow screens instead of pushing the page layout sideways. */
+        .trend-chart {
+            height: 150px; display: flex; align-items: flex-end; gap: 9px;
+            padding: 12px 4px 0; border-bottom: 1px solid var(--border);
+            overflow-x: auto; overflow-y: hidden;
+        }
+        .trend-point {
+            flex: 1 0 40px; height: 100%; display: flex; flex-direction: column;
+            justify-content: flex-end; align-items: center; min-width: 40px;
+        }
+        .trend-value {
+            color: var(--text-main); font-size: 0.68rem; margin-bottom: 6px;
+            white-space: nowrap; max-width: 100%;
+        }
         .trend-bar { width: 100%; max-width: 34px; min-height: 8px; border-radius: 6px 6px 2px 2px; background: linear-gradient(to top, var(--purple-500), var(--purple-300)); transition: height 0.2s ease; }
         .trend-date { color: var(--text-muted); font-size: 0.62rem; margin-top: 7px; white-space: nowrap; }
         .trend-note { margin: 14px 0 0; color: var(--text-muted); font-size: 0.75rem; }

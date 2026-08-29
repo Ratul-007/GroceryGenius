@@ -104,22 +104,33 @@ if (!in_array($selected_month, $available_months)) {
     <link rel="stylesheet" href="../assets/css/style.css"/>
     <style>
 
-        /* ── STATS ── */
-        .stats-grid {
+        /* ── STATS ──
+           NOTE: These are intentionally namespaced with an "eh-" prefix
+           (not .stat-card / .stat-label / .stat-value) because the global
+           style.css already defines .stat-card as a flex row (icon + text)
+           for other pages like budget.php. Reusing that class name here
+           made this page's label/value/sub divs render as flex items in a
+           row instead of stacked, squeezing the last column so narrow that
+           text wrapped one letter per line. */
+        .eh-stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 14px;
             margin-bottom: 24px;
         }
 
-        .stat-card {
+        .eh-stat-card {
+            display: block;
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius);
             padding: 18px 20px;
+            min-width: 0;
+            overflow: hidden;
         }
 
-        .stat-label {
+        .eh-stat-label {
+            display: block;
             font-size: 0.75rem;
             color: var(--text-muted);
             text-transform: uppercase;
@@ -127,17 +138,24 @@ if (!in_array($selected_month, $available_months)) {
             margin-bottom: 8px;
         }
 
-        .stat-value {
+        .eh-stat-value {
+            display: block;
             font-size: 1.6rem;
             font-weight: 800;
             color: var(--purple-300);
-            line-height: 1;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .stat-sub {
+        .eh-stat-sub {
+            display: block;
             font-size: 0.72rem;
             color: var(--text-soft);
             margin-top: 5px;
+            overflow-wrap: break-word;
+            word-break: break-word;
         }
 
         /* ── FILTER BAR ── */
@@ -300,7 +318,7 @@ if (!in_array($selected_month, $available_months)) {
         }
 
         @media (max-width: 768px) {
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .eh-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .filter-bar { flex-wrap: wrap; }
         }
 
@@ -349,23 +367,24 @@ if (!in_array($selected_month, $available_months)) {
 
             <a href="budget.php" class="nav-item">
                 <span class="nav-icon">💰</span> Budget
-            
-            <a href="expense_history.php" class="nav-item">
-    <span class="nav-icon">🧾</span> Expense History
-</a>
-<a href="monthly_report.php" class="nav-item">
-    <span class="nav-icon">📊</span> Monthly Report
-</a>
-<a href="prices.php" class="nav-item">
+            </a>
+
+            <a href="expense_history.php" class="nav-item active">
+                <span class="nav-icon">🧾</span> Expense History
+            </a>
+            <a href="monthly_report.php" class="nav-item">
+                <span class="nav-icon">📊</span> Monthly Report
+            </a>
+            <a href="prices.php" class="nav-item">
                 <span class="nav-icon">📊</span> Price Tracker
             </a>
 
             <div class="nav-label">Account</div>
 
             <a href="profile.php" class="nav-item">
-    <span class="nav-icon">👤</span> Profile
-</a>
-<a href="logout.php" class="nav-item">
+                <span class="nav-icon">👤</span> Profile
+            </a>
+            <a href="logout.php" class="nav-item">
                 <span class="nav-icon">🚪</span> Logout
             </a>
 
@@ -396,32 +415,32 @@ if (!in_array($selected_month, $available_months)) {
 
 
         <!-- STATS -->
-        <div class="stats-grid">
+        <div class="eh-stats-grid">
 
-            <div class="stat-card">
-                <div class="stat-label">Total Spent</div>
-                <div class="stat-value">৳<?= number_format((float)$stats['total_spent'], 0) ?></div>
-                <div class="stat-sub"><?= date('F Y', strtotime($selected_month . '-01')) ?></div>
+            <div class="eh-stat-card">
+                <div class="eh-stat-label">Total Spent</div>
+                <div class="eh-stat-value">৳<?= number_format((float)$stats['total_spent'], 0) ?></div>
+                <div class="eh-stat-sub"><?= date('F Y', strtotime($selected_month . '-01')) ?></div>
             </div>
 
-            <div class="stat-card">
-                <div class="stat-label">Purchases</div>
-                <div class="stat-value"><?= (int)$stats['total_purchases'] ?></div>
-                <div class="stat-sub">items bought</div>
+            <div class="eh-stat-card">
+                <div class="eh-stat-label">Purchases</div>
+                <div class="eh-stat-value"><?= (int)$stats['total_purchases'] ?></div>
+                <div class="eh-stat-sub">items bought</div>
             </div>
 
-            <div class="stat-card">
-                <div class="stat-label">Biggest Purchase</div>
-                <div class="stat-value">৳<?= number_format((float)$stats['biggest_purchase'], 0) ?></div>
-                <div class="stat-sub">single item</div>
+            <div class="eh-stat-card">
+                <div class="eh-stat-label">Biggest Purchase</div>
+                <div class="eh-stat-value">৳<?= number_format((float)$stats['biggest_purchase'], 0) ?></div>
+                <div class="eh-stat-sub">single item</div>
             </div>
 
-            <div class="stat-card">
-                <div class="stat-label">Top Product</div>
-                <div class="stat-value" style="font-size:1rem; padding-top:4px;">
+            <div class="eh-stat-card">
+                <div class="eh-stat-label">Top Product</div>
+                <div class="eh-stat-value" style="font-size:1rem; padding-top:4px;">
                     <?= $top_product ? htmlspecialchars($top_product['product_name']) : '—' ?>
                 </div>
-                <div class="stat-sub">
+                <div class="eh-stat-sub">
                     <?= $top_product ? '৳'.number_format((float)$top_product['total'], 2) . ' total' : 'no data' ?>
                 </div>
             </div>
