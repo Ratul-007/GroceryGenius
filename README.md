@@ -2,20 +2,42 @@
 
 A smart grocery management and meal planning web application built for everyday Bangladeshi households.
 
+![PHP](https://img.shields.io/badge/PHP-8-777BB4?logo=php&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-MariaDB%2010.4-4479A1?logo=mysql&logoColor=white)
+![Server](https://img.shields.io/badge/Server-Apache%20(XAMPP)-D22128?logo=apache&logoColor=white)
+![Status](https://img.shields.io/badge/Status-Active-brightgreen)
+![License](https://img.shields.io/badge/License-Academic%20Project-lightgrey)
+
+---
+
+## 📑 Table of Contents
+
+- [Features](#-features)
+- [Team](#-team--404-team-not-found)
+- [Tech Stack](#️-tech-stack)
+- [Installation](#️-installation)
+- [Project Structure](#-project-structure)
+- [Core Loop](#-core-loop)
+- [Database Tables](#️-database-tables)
+- [Future Scope](#-future-scope)
+- [License](#-license)
+
+---
+
 ## 🌟 Features
 
 - **Dashboard** — Live overview of pantry status, expiry alerts, budget usage, and recipes cooked this month
 - **Pantry Manager** — Track grocery items, quantities, and expiry dates with automatic expired/expiring-soon alerts
-- **Recipe Suggestions** — Get recipe ideas ranked by available purchased ingredients with pantry match percentage
 - **Cook Mode** — Step-by-step cooking guide with serving size adjuster and automatic ingredient deduction on completion
 - **Cooking History** — Full log of every recipe cooked with date, time, and stats
-- **Recipe Favorites** — Bookmark favourite recipes for quick access
 - **Shopping List** — Add items, mark as purchased, and auto-deduct from monthly budget
 - **Budget Tracker** — Monitor grocery spending with colour-coded progress bar and audio alerts (amber warning + red air horn)
 - **Expense History** — Day-by-day breakdown of all grocery purchases with monthly filter
 - **Monthly Report** — Full monthly summary including daily spending chart, top products, category breakdown, and recipes cooked
 - **Price Tracker** — Record and compare daily grocery prices with 7-day trend charts and yesterday comparison
 - **Profile Page** — Update name, contact, profile photo, and change password
+
+---
 
 ## 👥 Team — 404 Team Not Found
 
@@ -25,6 +47,8 @@ A smart grocery management and meal planning web application built for everyday 
 | Arnab | Frontend Developer |
 | Prabak | UI/UX Designer |
 
+---
+
 ## 🛠️ Tech Stack
 
 | Layer | Technology |
@@ -33,6 +57,8 @@ A smart grocery management and meal planning web application built for everyday 
 | Backend | PHP 8 |
 | Database | MySQL (MariaDB 10.4) |
 | Server | Apache (XAMPP) |
+
+---
 
 ## ⚙️ Installation
 
@@ -59,6 +85,8 @@ A smart grocery management and meal planning web application built for everyday 
 
 5. **Run the app**
    - Visit `http://localhost/GroceryGenius/index.php`
+
+---
 
 ## 📁 Project Structure
 
@@ -88,6 +116,8 @@ GroceryGenius/
 └── index.php               # Entry point (redirects to login/dashboard)
 ```
 
+---
+
 ## 🔄 Core Loop
 
 ```
@@ -103,6 +133,8 @@ Finish Cooking → Ingredients Deducted
        ↓
 Recipe resets to 0% → Loop continues 🔄
 ```
+
+---
 
 ## 🗄️ Database Tables
 
@@ -121,14 +153,16 @@ Recipe resets to 0% → Loop continues 🔄
 | `grocery_prices` | Current tracked prices |
 | `price_history` | Historical price records |
 
+---
+
 ## 🔮 Future Scope
 
 - **Automated Price Updates** — Integration with TCB (Trading Corporation of Bangladesh) daily commodity price data
 - **AI Recipe Recommendations** — Smarter suggestions using machine learning based on pantry contents and preferences
-- **Mobile App** — Native Android/iOS version for on-the-go management
 - **Multi-user Household** — Share pantry and shopping lists across family members
 - **Barcode Scanner** — Scan product barcodes to add items to pantry instantly
-- **Price Alert System** — Get notified when a tracked product price rises above a threshold
+
+---
 
 ## 📄 License
 
