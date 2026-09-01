@@ -32,13 +32,14 @@ CREATE TABLE pantry_items (
 );
 
 CREATE TABLE shopping_list (
-  list_item_id   INT AUTO_INCREMENT PRIMARY KEY,
-  user_id        INT,
-  product_id     INT,
-  quantity       DECIMAL(8,2),
-  is_purchased   TINYINT DEFAULT 0,
+  list_item_id    INT AUTO_INCREMENT PRIMARY KEY,
+  user_id         INT,
+  product_id      INT,
+  quantity        DECIMAL(8,2),
+  is_purchased    TINYINT DEFAULT 0,
   purchase_amount DECIMAL(10,2) NULL,
-  FOREIGN KEY (user_id) REFERENCES users(user_id)
+  FOREIGN KEY (user_id) REFERENCES users(user_id),
+  FOREIGN KEY (product_id) REFERENCES products(product_id)
 );
 
 CREATE TABLE budget (
@@ -50,10 +51,26 @@ CREATE TABLE budget (
   FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
+-- Current/latest price for each product.
 CREATE TABLE grocery_prices (
   price_id    INT AUTO_INCREMENT PRIMARY KEY,
-  product_id  INT,
-  price_bdt   DECIMAL(10,2),
+  product_id  INT NOT NULL,
+  price_bdt   DECIMAL(10,2) NOT NULL,
   updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (product_id) REFERENCES products(product_id)
+  FOREIGN KEY (product_id) REFERENCES products(product_id),
+  INDEX idx_grocery_prices_product (product_id),
+  INDEX idx_grocery_prices_updated (updated_at)
+);
+
+-- Historical price changes used by the Price Tracker and 7-day trend charts.
+-- A product can have multiple records, including multiple changes on the same day.
+CREATE TABLE price_history (
+  history_id   INT AUTO_INCREMENT PRIMARY KEY,
+  product_id   INT NOT NULL,
+  price_bdt    DECIMAL(10,2) NOT NULL,
+  recorded_date DATE NOT NULL,
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES products(product_id),
+  INDEX idx_price_history_product_date (product_id, recorded_date),
+  INDEX idx_price_history_recorded_date (recorded_date)
 );
